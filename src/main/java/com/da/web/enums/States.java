@@ -1,24 +1,29 @@
 package com.da.web.enums;
 
-/**
- * 状态码
- */
-public enum States {
-    //    成功的状态码
-    OK(200),
-    //    失败的状态码
-    ERROR(500),
-    //    找不到的状态码
-    NOT_FOUND(404);
-    private final int code;
+import com.da.web.constant.HttpStatus;
 
-    @Override
-    public String toString() {
-        return String.valueOf(code);
-    }
+/**
+ * HTTP 状态码枚举
+ * @deprecated 请使用 {@link HttpStatus} 常量类
+ */
+@Deprecated
+public enum States {
+    OK(HttpStatus.OK),
+    ERROR(HttpStatus.INTERNAL_SERVER_ERROR),
+    NOT_FOUND(HttpStatus.NOT_FOUND);
+    
+    private final int code;
 
     States(int code) {
         this.code = code;
     }
 
+    public int getCode() {
+        return code;
+    }
+
+    @Override
+    public String toString() {
+        return String.valueOf(code);
+    }
 }
