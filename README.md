@@ -1,6 +1,21 @@
-# 用nio做个简单的web服务器
+# NIO Simple Web Server
 
-## 使用maven安装依赖
+基于 Java NIO 实现的轻量级 Web 服务器，支持 HTTP 和 WebSocket 协议。
+
+## 特性
+
+- ✅ 基于 NIO 的非阻塞 IO 模型
+- ✅ 支持 HTTP 请求处理（GET/POST）
+- ✅ 支持静态资源服务
+- ✅ 支持注解驱动的路由注册（@Path）
+- ✅ 支持依赖注入（@Component, @Inject）
+- ✅ 完整的 WebSocket 支持（连接管理、消息发送、广播）
+- ✅ 配置文件支持（app.properties）
+- ✅ Bean 容器管理
+
+## 快速开始
+
+### Maven 依赖
 
 ```xml
 <!--添加 nio-simple-web 仓库地址-->
@@ -23,6 +38,8 @@
 </dependencies>
 ```
 
+### 基础示例
+
 ```java
 public class App {
     public static void main(String[] args) {
@@ -33,13 +50,15 @@ public class App {
 }
 ```
 
+### 注解方式注册路由
+
 ```java
 public class App {
     public static void main(String[] args) {
-//        自动扫描加了@Path注解并且实现了Handler接口的类,注册到路由表
+        // 自动扫描加了@Path 注解并且实现了 Handler 接口的类，注册到路由表
         DApp app = new DApp(App.class);
         app.listen();
-//        获取配置文件中的信息
+        // 获取配置文件中的信息
         System.out.println(app.getCfgInfo("port"));
     }
 }
@@ -53,33 +72,39 @@ public class IndexController implements Handler {
 }
 ```
 
-#### 使用配置文件配置端口和static目录 resources/app.properties
+### 配置文件
+
+在 `resources/app.properties` 中配置：
 
 ```properties
-#指定端口号(默认从8080开始找可以的端口)
+#指定端口号 (默认从 8080 开始找可用的端口)
 port=8083
-#指定static目录(默认为resources/static),用/分开文件夹,static目录下的index.html访问路径为/
+#指定 static 目录 (默认为 resources/static),用/分开文件夹，static 目录下的 index.html 访问路径为/
 static=aaa/aaa
 ```
+
+### 依赖注入示例
 
 ```java
 public class App {
     public static void main(String[] args) {
         DApp app = new DApp(App.class);
         app.use("/", ctx -> ctx.sendHtml("<h1>hello world</h1>"));
-//        @Component注册的bean
+        
+        // @Component 注册的 bean
         Dog dog = app.getBean("dog", Dog.class);
         System.out.println(dog);
-//        @path注解用路径表示beanName
+        
+        // @path 注解用路径表示 beanName
         IndexController bean = (IndexController) app.getBean("/hello");
         System.out.println(bean);
+        
         app.listen();
     }
 }
 
 @Component("dog")
 public class Dog {
-
     @Inject("小黄")
     private String name;
 
@@ -89,78 +114,49 @@ public class Dog {
                 "name='" + name + '\'' +
                 '}';
     }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
+    
+    // getters and setters...
 }
 
 @Component("user")
 public class User {
     @Inject("杰哥")
     private String name;
+    
     @Inject("dog")
     private Dog dog;
-
-    @Override
-    public String toString() {
-        return "User{" +
-                "name='" + name + '\'' +
-                ", dog=" + dog +
-                '}';
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public Dog getDog() {
-        return dog;
-    }
-
-    public void setDog(Dog dog) {
-        this.dog = dog;
-    }
+    
+    // getters and setters...
 }
 
 @Path("/hello")
 public class IndexController implements Handler {
-
     @Inject("user")
     private User user;
 
     @Inject("20")
     private int age;
 
-    // 如果没有@Inject注解会尝试从请求参数中注入值
+    // 如果没有@Inject 注解会尝试从请求参数中注入值
     private String name;
-
     private int sex;
 
     @Override
     public void callback(Context ctx) {
-        ctx.send(user.toString() + " name = "
+        ctx.send(user.toString() + " name = " 
                 + name + " age = " + age + " sex = " + sex);
     }
 }
 ```
 
-###### 获取传来的json字符串
+### 处理 JSON 数据
 
 ```java
 public class App {
     public static void main(String[] args) {
         final DApp app = new DApp(App.class);
         app.use("/aa", ctx -> {
-//            post请求传来的json字符串,因为写不出方便的json解析,所以就直接存整个传来的json字符串
+            // post 请求传来的 json 字符串
             final Object o = ctx.getParams().get("request-json-data");
             System.out.println(o);
             ctx.send("ok");
@@ -170,59 +166,78 @@ public class App {
 }
 ```
 
-##### 把实体类列表转成json数组形式字符串
+### 实体类转 JSON
 
 ```java
 public class App {
     public static void main(String[] args) {
-//        把实体类列表转成json数组形式字符串
-        System.out.println(Utils.parseListToJsonString(Arrays.asList(new User("a"), new User("b"), new User("c"))));
-// {"User":[{"name":"a"},{"name":"b"},{"name":"c"}]}
+        // 把实体类列表转成 json 数组形式字符串
+        System.out.println(Utils.parseListToJsonString(
+            Arrays.asList(new User("a"), new User("b"), new User("c"))
+        ));
+        // 输出：{"User":[{"name":"a"},{"name":"b"},{"name":"c"}]}
     }
 }
 
 class User {
     public String name;
-
     public User(String name) {
         this.name = name;
     }
 }
 ```
 
-## 简单的websocket服务器功能(非常弱,功能不完善)
+## WebSocket 功能
 
-创建监听器
+### 完整示例
+
+#### 1. 创建 WebSocket 监听器
 
 ```java
 import com.da.web.annotations.Component;
 import com.da.web.core.Context;
 import com.da.web.function.WsListener;
-import com.da.web.util.Utils;
+import com.da.web.websocket.WebSocketManager;
 
-// 注册到容器,并且实现WsListener接口
+// 注册到容器，并且实现 WsListener 接口
 @Component("ws")
 public class WsImpl implements WsListener {
 
     @Override
+    public void onOpen(Context ctx) throws Exception {
+        System.out.println("新客户端连接！当前连接数：" + WebSocketManager.getConnectionCount());
+        // 发送欢迎消息
+        WebSocketManager.sendMessage(ctx.getChannel(), "欢迎连接 WebSocket 服务器！");
+    }
+
+    @Override
     public void onMessage(Context ctx, String message) throws Exception {
-        System.out.println("收到客户端发来的消息: " + message);
-        Utils.sendWsMessage("服务器收到了来自客户端的消息...", ctx.getChannel());
+        System.out.println("收到客户端消息：" + message);
+        
+        // 回复消息
+        WebSocketManager.sendMessage(ctx.getChannel(), "服务器收到：" + message);
+        
+        // 或者广播给所有客户端
+        // WebSocketManager.broadcast("广播消息：" + message);
     }
 
     @Override
     public void onError(Context ctx, Exception e) {
-        System.out.println(e.getMessage());
+        if (e == null) {
+            System.out.println("客户端正常断开连接");
+        } else {
+            System.out.println("连接错误：" + e.getMessage());
+        }
     }
 
     @Override
     public void onClose(Context ctx) throws Exception {
-        System.out.println("关闭");
+        System.out.println("连接关闭！当前连接数：" + WebSocketManager.getConnectionCount());
     }
 }
 ```
 
-注册监听器
+#### 2. 注册 WebSocket 路由
 
 ```java
 import com.da.web.annotations.Inject;
@@ -230,72 +245,185 @@ import com.da.web.annotations.Path;
 import com.da.web.core.Context;
 import com.da.web.function.Handler;
 import com.da.web.function.WsListener;
-import com.da.web.util.Utils;
 
 @Path("/ws")
-public class IndexController implements Handler {
+public class WebSocketController implements Handler {
 
     @Inject("ws")
     WsListener wsListener;
 
     @Override
     public void callback(Context ctx) throws Exception {
-//        注册监听器
+        // 注册监听器，完成 WebSocket 握手
         ctx.setWsListener(wsListener);
-//        发送消息到客户端
-        Utils.sendWsMessage("来自服务端的消息", ctx.getChannel());
     }
-
 }
 ```
 
-网页测试,在控制台中查看结果
+#### 3. 前端测试页面
 
 ```html
 <!DOCTYPE html>
 <html lang="zh">
-
 <head>
     <meta charset="UTF-8">
-    <title>测试websocket服务器</title>
+    <title>WebSocket 测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #messages { border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; margin: 10px 0; }
+        .message { margin: 5px 0; padding: 5px; background: #f0f0f0; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        input { padding: 10px; width: 300px; }
+    </style>
 </head>
-
 <body>
-<h1>测试websocket服务器</h1>
-<button onclick="send()">发送</button>
-<script>
+    <h1>WebSocket 测试</h1>
+    <div id="status">状态：未连接</div>
+    <div id="messages"></div>
+    <input type="text" id="messageInput" placeholder="输入消息...">
+    <button onclick="send()">发送</button>
+    <button onclick="closeConnection()">断开连接</button>
 
-        // 开启websocket服务
-        const socket = new WebSocket('ws://localhost:8080/ws');
+    <script>
+        let socket;
+        const messagesDiv = document.getElementById('messages');
+        const statusDiv = document.getElementById('status');
 
-        // 监听连接
-        socket.onopen = () => {
-            console.log("开启websocket")
+        function addMessage(text, isReceived = true) {
+            const div = document.createElement('div');
+            div.className = 'message';
+            div.style.background = isReceived ? '#e3f2fd' : '#f5f5f5';
+            div.textContent = (isReceived ? '收到：' : '发送：') + text;
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
 
-        // 监听消息
-        socket.onmessage = ({ data }) => {
-            console.log(data)
+        function connect() {
+            socket = new WebSocket('ws://localhost:8080/ws');
+
+            socket.onopen = () => {
+                statusDiv.textContent = '状态：已连接';
+                statusDiv.style.color = 'green';
+                addMessage('连接成功！');
+            };
+
+            socket.onmessage = (event) => {
+                addMessage(event.data);
+            };
+
+            socket.onclose = () => {
+                statusDiv.textContent = '状态：已断开';
+                statusDiv.style.color = 'red';
+                addMessage('连接已关闭');
+            };
+
+            socket.onerror = (error) => {
+                statusDiv.textContent = '状态：错误';
+                statusDiv.style.color = 'orange';
+                addMessage('连接错误');
+            };
         }
 
-        // 监听关闭
-        socket.onclose = () => {
-            console.log('websocket关闭')
+        function send() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            if (message && socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(message);
+                addMessage(message, false);
+                input.value = '';
+            }
         }
 
-        // 监听错误
-        socket.onerror = () => {
-            console.log('连接错误')
+        function closeConnection() {
+            if (socket) {
+                socket.close();
+            }
         }
 
-        // 发送消息
-        const send = () => {
-            socket.send("你好我是浏览器")
-        }
+        // 页面加载时自动连接
+        connect();
 
-
-</script>
+        // 回车发送
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') send();
+        });
+    </script>
 </body>
-
 </html>
 ```
+
+### WebSocketManager API
+
+| 方法 | 说明 |
+|------|------|
+| `addConnection(SocketChannel, Context)` | 添加 WebSocket 连接 |
+| `removeConnection(SocketChannel)` | 移除并关闭连接 |
+| `getContext(SocketChannel)` | 获取连接的上下文 |
+| `hasConnection(SocketChannel)` | 检查连接是否存在 |
+| `getConnectionCount()` | 获取当前连接数 |
+| `sendMessage(SocketChannel, String)` | 向指定连接发送消息 |
+| `broadcast(String)` | 广播消息给所有客户端 |
+| `closeAll()` | 关闭所有连接 |
+
+### WsListener 接口
+
+```java
+public interface WsListener {
+    // 连接建立时调用（可选实现）
+    default void onOpen(Context ctx) throws Exception { }
+    
+    // 收到消息时调用（必须实现）
+    void onMessage(Context ctx, String message) throws Exception;
+    
+    // 发生错误或关闭时调用（必须实现）
+    void onError(Context ctx, Exception e);
+    
+    // 连接关闭时调用（可选实现）
+    default void onClose(Context ctx) throws Exception { }
+}
+```
+
+## 项目结构
+
+```
+src/main/java/com/da/web/
+├── annotations/          # 注解定义
+│   ├── Component.java
+│   ├── Inject.java
+│   └── Path.java
+├── bean/                 # Bean 容器
+│   └── BeanContainer.java
+├── config/               # 配置管理
+│   └── ServerConfig.java
+├── constant/             # 常量定义
+│   ├── HttpStatus.java
+│   └── ContentTypes.java
+├── core/                 # 核心类
+│   ├── DApp.java         # 服务器主类
+│   └── Context.java      # 请求上下文
+├── enums/                # 枚举类型
+├── exception/            # 异常处理
+├── function/             # 函数式接口
+│   ├── Handler.java
+│   └── WsListener.java
+├── io/                   # IO 相关
+│   └── StaticFileRegistry.java
+├── router/               # 路由管理
+│   ├── RouteRegistry.java
+│   └── RouteMapping.java
+├── util/                 # 工具类
+│   └── Utils.java
+└── websocket/            # WebSocket 支持
+    └── WebSocketManager.java
+```
+
+## 注意事项
+
+1. **线程安全**：服务器使用 NIO 多路复用模型，支持高并发连接
+2. **WebSocket 帧解析**：支持标准的 WebSocket 协议帧格式（包括掩码处理）
+3. **连接管理**：使用 ConcurrentHashMap 和 CopyOnWriteArraySet 确保线程安全
+4. **自动重连端口**：如果指定端口被占用，会自动尝试下一个可用端口
+
+## License
+
+MIT License
