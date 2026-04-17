@@ -325,7 +325,7 @@ public class Context {
             
             if (response != null) {
                 response.contentType(fileType + ";charset=utf-8");
-                byte[] fileData = is.readAllBytes();
+                byte[] fileData = readFully(is);
                 response.body(fileData).send();
             } else {
                 String header = "HTTP/1.1 200\r\nContent-Type: " + fileType + ";charset=utf-8\r\n\r\n";
@@ -347,5 +347,21 @@ public class Context {
                 }
             }
         }
+    }
+    
+    /**
+     * Java 8 兼容的读取输入流全部字节的方法
+     * @param inputStream 输入流
+     * @return 字节数组
+     * @throws IOException IO 异常
+     */
+    private byte[] readFully(FileInputStream inputStream) throws IOException {
+        byte[] buffer = new byte[4096];
+        java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream();
+        int bytesRead;
+        while ((bytesRead = inputStream.read(buffer)) != -1) {
+            outputStream.write(buffer, 0, bytesRead);
+        }
+        return outputStream.toByteArray();
     }
 }
