@@ -16,7 +16,6 @@ public class JsonParser {
     /**
      * 解析 JSON，返回对应的 Java 对象
      */
-    @SuppressWarnings("unchecked")
     public Object parse() {
         skipWhitespace();
         if (pos >= json.length()) {

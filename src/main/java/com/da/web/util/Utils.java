@@ -19,6 +19,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.da.web.util.Logger;
+
 /**
  * Author Da
  * Description: <br/>
@@ -89,7 +91,7 @@ public class Utils {
      * @return 判断结果
      */
     public static boolean isNotBlank(String str) {
-        return null != str && !"".equals(str);
+        return null != str && !str.isEmpty();
     }
 
     /**
@@ -129,7 +131,7 @@ public class Utils {
      * @return 判断结果
      */
     public static <T> boolean isListNotNull(List<T> t) {
-        return null != t && t.size() > 0;
+        return null != t && !t.isEmpty();
     }
 
     /**
@@ -216,7 +218,7 @@ public class Utils {
         try {
             clz = UTILS.getClass().getClassLoader().loadClass(className);
         } catch (Exception e) {
-            e.printStackTrace();
+            Logger.error(Utils.class, e);
         }
         return clz;
     }
@@ -232,7 +234,7 @@ public class Utils {
         try {
             o = clz.getConstructor().newInstance();
         } catch (Exception e) {
-            e.printStackTrace();
+            Logger.error(Utils.class, e);
         }
         return o;
     }
@@ -264,7 +266,7 @@ public class Utils {
                         .filter(file -> !file.isDirectory())
                         .collect(Collectors.toList());
             } catch (IOException e) {
-                e.printStackTrace();
+                Logger.error(Utils.class, e);
             }
         }
         return list;
@@ -307,7 +309,7 @@ public class Utils {
                 return Files.readAllLines(file.toPath(), encoding)
                         .stream().reduce((a, b) -> a + b).orElse("");
             } catch (IOException e) {
-                e.printStackTrace();
+                Logger.error(Utils.class, e);
                 return "";
             }
         }
@@ -355,7 +357,7 @@ public class Utils {
         try {
             type = Files.probeContentType(file.toPath());
         } catch (IOException e) {
-            e.printStackTrace();
+            Logger.error(Utils.class, e);
             type = "";
         }
         return type;
@@ -399,7 +401,7 @@ public class Utils {
     public static <T> String parseListToJsonString(List<T> list) {
         final StringBuilder builder = new StringBuilder();
         try {
-            if (null != list && list.size() > 0) {
+            if (null != list && !list.isEmpty()) {
                 final T t = list.get(0);
                 final String listName = t.getClass().getSimpleName();
                 builder.append("{\"").append(listName).append("\":[");
@@ -422,7 +424,7 @@ public class Utils {
             }
             return builder.toString();
         } catch (IllegalAccessException e) {
-            e.printStackTrace();
+            Logger.error(Utils.class, e);
             return "";
         }
     }
@@ -442,7 +444,7 @@ public class Utils {
             sha1.update(keyOrigin.getBytes());
             accept = new String(Base64.getEncoder().encode(sha1.digest()));
         } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
+            Logger.error(Utils.class, e);
         }
         String echoHeader = "";
         echoHeader += "HTTP/1.1 101 Switching Protocols\r\n";

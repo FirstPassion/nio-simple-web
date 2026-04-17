@@ -12,7 +12,7 @@ public class HttpResponse {
     private final SocketChannel channel;
     private String httpVersion = "HTTP/1.1";
     private int statusCode = 200;
-    private MultiValueMap headers;
+    private final MultiValueMap headers;
     private byte[] body;
 
     public HttpResponse(SocketChannel channel, String httpVersion) {
