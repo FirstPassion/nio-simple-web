@@ -2,10 +2,46 @@
 
 基于 Java NIO 实现的轻量级 Web 服务器，支持 HTTP 和 WebSocket 协议。
 
+## ⚠️ 重要更新说明 (v2.0)
+
+**这是一个破坏性更新！** 我们完全重写了 HTTP 请求解析模块，采用递归下降法实现完整的 HTTP/1.1 解析器。
+
+### 主要变更
+
+1. **完全重构的 HTTP 解析器**：使用递归下降法手写解析，不依赖任何第三方库
+2. **移除旧的 States 枚举**：HTTP 状态码直接使用整数表示（如 `404`、`200`）
+3. **增强的 POST 请求处理**：
+   - 自动解析 `application/json`
+   - 自动解析 `application/x-www-form-urlencoded`
+   - 支持 `multipart/form-data` 文件上传
+   - 支持 `text/plain` 纯文本
+4. **新增 HttpRequest/HttpResponse 模型**：更清晰的请求响应对象
+5. **MultiValueMap**：支持多值的 Map，用于 HTTP 头部管理
+6. **JsonParser**：递归下降法实现的 JSON 解析器
+
+### 迁移指南
+
+#### 旧代码
+```java
+context.sendHtml("<h1>404</h1>", States.NOT_FOUND.ordinal());
+```
+
+#### 新代码
+```java
+context.sendHtml("<h1>404</h1>", 404);
+```
+
 ## 特性
 
 - ✅ 基于 NIO 的非阻塞 IO 模型
-- ✅ 支持 HTTP 请求处理（GET/POST）
+- ✅ 支持 HTTP/1.1 协议（完整实现）
+- ✅ 支持 HTTP 请求处理（GET/POST/PUT/DELETE 等）
+- ✅ **新增** 递归下降法实现的 HTTP 解析器
+- ✅ **新增** 支持 `application/json` 自动解析
+- ✅ **新增** 支持 `application/x-www-form-urlencoded` 表单解析
+- ✅ **新增** 支持 `multipart/form-data` 文件上传解析
+- ✅ **新增** 完整的请求头管理（MultiValueMap）
+- ✅ **新增** 响应构建器模式（HttpResponse）
 - ✅ 支持静态资源服务
 - ✅ 支持注解驱动的路由注册（@Path）
 - ✅ 支持依赖注入（@Component, @Inject）
@@ -156,11 +192,61 @@ public class App {
     public static void main(String[] args) {
         final DApp app = new DApp(App.class);
         app.use("/aa", ctx -> {
-            // post 请求传来的 json 字符串
+            // post 请求传来的 json 字符串（旧方式，兼容）
             final Object o = ctx.getParams().get("request-json-data");
             System.out.println(o);
+            
+            // 新方式：使用 getBodyAsJson() 获取 JSON 字符串
+            String jsonStr = ctx.getBodyAsJson();
+            System.out.println("JSON: " + jsonStr);
+            
+            // 或者使用 getBodyAs(Map.class) 直接解析为 Map
+            Map<String, Object> bodyMap = ctx.getBodyAs(Map.class);
+            System.out.println("Parsed: " + bodyMap);
+            
             ctx.send("ok");
         });
+        app.listen();
+    }
+}
+```
+
+### 访问请求头和请求体
+
+```java
+public class App {
+    public static void main(String[] args) {
+        DApp app = new DApp();
+        
+        app.use("/info", ctx -> {
+            // 获取原始 HttpRequest 对象
+            HttpRequest request = ctx.getRequest();
+            
+            // 获取请求头
+            String userAgent = ctx.getHeader("User-Agent");
+            String contentType = ctx.getContentType();
+            
+            // 获取查询参数
+            String name = (String) ctx.getParams().get("name");
+            
+            // 获取请求体参数（表单或 JSON 自动解析）
+            String username = (String) ctx.getBodyParam("username");
+            String password = (String) ctx.getBodyParam("password");
+            
+            // 获取原始请求体字节
+            byte[] rawBody = ctx.getRawBody();
+            
+            StringBuilder sb = new StringBuilder();
+            sb.append("Method: ").append(ctx.getMethod()).append("<br>");
+            sb.append("URL: ").append(ctx.getUrl()).append("<br>");
+            sb.append("User-Agent: ").append(userAgent).append("<br>");
+            sb.append("Content-Type: ").append(contentType).append("<br>");
+            sb.append("Name (query): ").append(name).append("<br>");
+            sb.append("Username (body): ").append(username).append("<br>");
+            
+            ctx.sendHtml(sb.toString());
+        });
+        
         app.listen();
     }
 }
