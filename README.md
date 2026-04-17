@@ -2,35 +2,6 @@
 
 基于 Java NIO 实现的轻量级 Web 服务器，支持 HTTP 和 WebSocket 协议。
 
-## ⚠️ 重要更新说明 (v2.0)
-
-**这是一个破坏性更新！** 我们完全重写了 HTTP 请求解析模块，采用递归下降法实现完整的 HTTP/1.1 解析器。
-
-### 主要变更
-
-1. **完全重构的 HTTP 解析器**：使用递归下降法手写解析，不依赖任何第三方库
-2. **移除旧的 States 枚举**：HTTP 状态码直接使用整数表示（如 `404`、`200`）
-3. **增强的 POST 请求处理**：
-   - 自动解析 `application/json`
-   - 自动解析 `application/x-www-form-urlencoded`
-   - 支持 `multipart/form-data` 文件上传
-   - 支持 `text/plain` 纯文本
-4. **新增 HttpRequest/HttpResponse 模型**：更清晰的请求响应对象
-5. **MultiValueMap**：支持多值的 Map，用于 HTTP 头部管理
-6. **JsonParser**：递归下降法实现的 JSON 解析器
-
-### 迁移指南
-
-#### 旧代码
-```java
-context.sendHtml("<h1>404</h1>", States.NOT_FOUND.ordinal());
-```
-
-#### 新代码
-```java
-context.sendHtml("<h1>404</h1>", 404);
-```
-
 ## 特性
 
 - ✅ 基于 NIO 的非阻塞 IO 模型
