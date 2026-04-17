@@ -304,4 +304,14 @@ public class JsonParser {
         }
         return false;
     }
+    
+    /**
+     * 静态方法：解析 JSON 字符串
+     */
+    public static Object parse(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            return null;
+        }
+        return new JsonParser(json).parse();
+    }
 }

@@ -44,6 +44,11 @@ public class Logger {
         if (!enabled) return;
         log(clazz, "ERROR", msg);
     }
+    
+    public static void error(Class<?> clazz, String msg, Exception e) {
+        if (!enabled) return;
+        log(clazz, "ERROR", msg + ": " + getStackTrace(e));
+    }
 
     public static void warn(Class<?> clazz, String msg) {
         if (!enabled) return;
