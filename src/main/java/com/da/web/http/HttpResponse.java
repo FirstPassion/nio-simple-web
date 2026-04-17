@@ -140,6 +140,55 @@ public class HttpResponse {
     }
 
     /**
+     * 快捷方法：发送 SSE 事件
+     * 用于 Server-Sent Events (SSE) 流式响应
+     */
+    public void sendSSEvent(String event, String data) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        if (event != null && !event.isEmpty()) {
+            sb.append("event: ").append(event).append("\r\n");
+        }
+        sb.append("data: ").append(data).append("\r\n\r\n");
+        ByteBuffer buffer = ByteBuffer.wrap(sb.toString().getBytes(StandardCharsets.UTF_8));
+        channel.write(buffer);
+    }
+
+    /**
+     * 快捷方法：发送 SSE 数据（不带事件类型）
+     */
+    public void sendSSData(String data) throws IOException {
+        sendSSEvent(null, data);
+    }
+
+    /**
+     * 发送 SSE 响应头（不关闭连接）
+     * 用于初始化 SSE 流式连接
+     */
+    public void sendSSEHeaders() throws IOException {
+        // 构建 SSE 响应头
+        StringBuilder response = new StringBuilder();
+        response.append(httpVersion).append(" ").append(statusCode).append("\r\n");
+        response.append("Content-Type: text/event-stream;charset=UTF-8\r\n");
+        response.append("Cache-Control: no-cache\r\n");
+        response.append("Connection: keep-alive\r\n");
+        response.append("Access-Control-Allow-Origin: *\r\n");
+        response.append("\r\n");
+
+        ByteBuffer buffer = ByteBuffer.wrap(response.toString().getBytes(StandardCharsets.UTF_8));
+        channel.write(buffer);
+        // 注意：这里不关闭连接，保持长连接用于流式传输
+    }
+
+    /**
+     * 直接通过 SocketChannel 发送数据（不关闭连接）
+     * 用于 SSE 流式传输
+     */
+    public void writeDirect(String data) throws IOException {
+        ByteBuffer buffer = ByteBuffer.wrap(data.getBytes(StandardCharsets.UTF_8));
+        channel.write(buffer);
+    }
+
+    /**
      * 快捷方法：发送错误响应
      */
     public void sendError(int code, String message) throws IOException {
@@ -150,5 +199,14 @@ public class HttpResponse {
                 "<hr/><p>" + message + "</p></body></html>";
         body(html);
         send();
+    }
+
+    /**
+     * 保持连接活跃（用于 SSE 长连接）
+     * 发送注释行作为心跳，防止连接超时
+     */
+    public void sendSSEKeepAlive() throws IOException {
+        ByteBuffer buffer = ByteBuffer.wrap(": keep-alive\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+        channel.write(buffer);
     }
 }
