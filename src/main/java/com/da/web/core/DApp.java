@@ -6,6 +6,7 @@ import com.da.web.annotations.Path;
 import com.da.web.function.Handler;
 import com.da.web.function.WsListener;
 import com.da.web.util.Utils;
+import com.da.web.util.Logger;
 
 import java.io.File;
 import java.io.IOException;
@@ -104,6 +105,9 @@ public class DApp {
 //        解析静态资源目录
         final String staticPath = getCfgInfo("static");
         if (Utils.isNotBlank(staticPath)) staticDirName = staticPath;
+//        解析日志开关
+        final String logEnabled = getCfgInfo("log");
+        Logger.init(logEnabled);
     }
 
     //        扫描静态资源目录添加静态资源map中去
@@ -178,7 +182,7 @@ public class DApp {
                 Object o = conv.apply(beanNameOrValue);
                 field.set(bean, o);
             } catch (Exception e) {
-                e.printStackTrace();
+                Logger.error(DApp.class, e);
             } finally {
                 field.setAccessible(false);
             }
@@ -190,7 +194,7 @@ public class DApp {
             try {
                 field.set(bean, o);
             } catch (IllegalAccessException e) {
-                e.printStackTrace();
+                Logger.error(DApp.class, e);
             } finally {
                 field.setAccessible(true);
             }
@@ -260,7 +264,7 @@ public class DApp {
                         }
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    Logger.error(DApp.class, e);
                 }
             }
 //               符合的实例化丢到bean池中
@@ -303,9 +307,7 @@ public class DApp {
 //        开启新的线程
         serverThread.start();
 //        jvm关闭的时候关闭循环和执行的线程,可以不用写这段,写了也无所谓
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            shutdown();
-        }));
+        Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
     }
 
     //    启动服务器
@@ -490,16 +492,15 @@ public class DApp {
                 " / __ |\\__  \\   \\ \\/ \\/ // __ \\| __ \\ ", "/ /_/ | / __ \\_  \\     /\\  ___/| \\_\\ \\",
                 "\\____ |(____  /   \\/\\_/  \\___  >___  /", "     \\/     \\/               \\/    \\/"
         };
-        // 打印banner图
-        for (String s : banner) System.out.println(s);
-        System.out.println("NIO服务器启动成功:");
-        System.out.println("\t> 本地访问: http://localhost:" + port);
+        for (String s : banner) Logger.info(DApp.class, s);
+        Logger.info(DApp.class, "NIO服务器启动成功:");
+        Logger.info(DApp.class, "\t> 本地访问: http://localhost:" + port);
         try {
-            System.out.println("\t> 网络访问: http://" + InetAddress.getLocalHost().getHostAddress() + ":" + port);
+            Logger.info(DApp.class, "\t> 网络访问: http://" + InetAddress.getLocalHost().getHostAddress() + ":" + port);
         } catch (UnknownHostException e) {
-            e.printStackTrace();
+            Logger.error(DApp.class, e);
         }
-        System.out.println("\t启动总耗时: " + (System.currentTimeMillis() - startTime) + "ms\n");
+        Logger.info(DApp.class, "\t启动总耗时: " + (System.currentTimeMillis() - startTime) + "ms");
     }
 
     /**
@@ -547,7 +548,7 @@ public class DApp {
                 return properties.getProperty(propName);
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            Logger.error(DApp.class, e);
         }
         return "";
     }
@@ -584,7 +585,7 @@ public class DApp {
 //                    把当前的选择器注册为读取事件
                     socket.register(selector, SelectionKey.OP_READ);
                 } catch (ClosedChannelException e) {
-                    e.printStackTrace();
+                    Logger.error(DApp.class, e);
                 }
             });
             // 唤醒被阻塞的Selector select类似LockSupport中的park，wakeup的原理类似LockSupport中的unpark
@@ -658,7 +659,7 @@ public class DApp {
                         iterator.remove();
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    Logger.error(DApp.class, e);
                 }
             }
         }

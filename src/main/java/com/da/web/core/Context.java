@@ -6,7 +6,7 @@ import com.da.web.http.HttpParser;
 import com.da.web.http.HttpRequest;
 import com.da.web.http.HttpResponse;
 import com.da.web.util.Utils;
-import com.da.web.websocket.WebSocketManager;
+import com.da.web.util.Logger;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -158,10 +158,10 @@ public class Context {
         
         String msg = "请求方式 [" + request.getMethod() + "] 请求路径 [" + request.getUrl() + "]";
         if (!request.getQueryParams().isEmpty() || !request.getBodyParams().isEmpty()) {
-            System.out.println(msg + " 请求参数 [queryParams=" + request.getQueryParams() + 
+            Logger.info(Context.class, msg + " 请求参数 [queryParams=" + request.getQueryParams() + 
                 ", bodyParams=" + request.getBodyParams() + "]");
         } else {
-            System.out.println(msg);
+            Logger.info(Context.class, msg);
         }
     }
 
@@ -195,7 +195,7 @@ public class Context {
      * 发送错误信息
      */
     public void errPrint(Exception e, HttpResponse resp) {
-        e.printStackTrace();
+        Logger.error(Context.class, e);
         try {
             if (resp != null) {
                 resp.sendError(500, e.getMessage());
@@ -209,7 +209,7 @@ public class Context {
                 channel.close();
             }
         } catch (IOException e1) {
-            e1.printStackTrace();
+            Logger.error(Context.class, e1);
         }
     }
 
@@ -318,11 +318,9 @@ public class Context {
      */
     public void send(File file) {
         String fileType = Utils.getFileType(file);
-        FileInputStream is = null;
-        
-        try {
-            is = new FileInputStream(file);
-            
+
+        try (FileInputStream is = new FileInputStream(file)) {
+
             if (response != null) {
                 response.contentType(fileType + ";charset=utf-8");
                 byte[] fileData = readFully(is);
@@ -330,7 +328,7 @@ public class Context {
             } else {
                 String header = "HTTP/1.1 200\r\nContent-Type: " + fileType + ";charset=utf-8\r\n\r\n";
                 channel.write(ByteBuffer.wrap(header.getBytes(StandardCharsets.UTF_8)));
-                
+
                 FileChannel fc = is.getChannel();
                 fc.transferTo(0, fc.size(), channel);
                 fc.close();
@@ -338,14 +336,6 @@ public class Context {
             }
         } catch (IOException e) {
             errPrint(e);
-        } finally {
-            if (is != null) {
-                try {
-                    is.close();
-                } catch (IOException e) {
-                    errPrint(e);
-                }
-            }
         }
     }
     

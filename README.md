@@ -18,6 +18,7 @@
 - ✅ 支持依赖注入（@Component, @Inject）
 - ✅ 完整的 WebSocket 支持（连接管理、消息发送、广播）
 - ✅ 配置文件支持（app.properties）
+- ✅ 日志开关配置（log=true/false）
 - ✅ Bean 容器管理
 
 ## 快速开始
@@ -40,7 +41,7 @@
     <dependency>
         <groupId>com.da</groupId>
         <artifactId>nio-simple-web</artifactId>
-        <version>1.0.1</version>
+        <version>1.0.2</version>
     </dependency>
 </dependencies>
 ```
@@ -84,10 +85,12 @@ public class IndexController implements Handler {
 在 `resources/app.properties` 中配置：
 
 ```properties
-#指定端口号 (默认从 8080 开始找可用的端口)
+# 端口号 (默认从 8080 开始找可用的端口)
 port=8083
-#指定 static 目录 (默认为 resources/static),用/分开文件夹，static 目录下的 index.html 访问路径为/
+# 静态资源目录 (默认为 resources/static)
 static=aaa/aaa
+# 日志开关 (默认为 true)
+log=true
 ```
 
 ### 依赖注入示例
