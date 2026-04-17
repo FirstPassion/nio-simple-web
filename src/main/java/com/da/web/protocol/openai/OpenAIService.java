@@ -1,29 +1,27 @@
-package com.da.web.openai;
+package com.da.web.protocol.openai;
 
-import com.da.web.annotations.Path;
+import com.da.web.annotations.Component;
+import com.da.web.annotations.Inject;
+import com.da.web.model.ChatRequest;
 import com.da.web.core.Context;
+import com.da.web.core.LlmProvider;
+import com.da.web.model.Message;
 import com.da.web.function.Handler;
 import com.da.web.http.JsonParser;
-import com.da.web.sse.SSEManager;
 import com.da.web.util.Logger;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * OpenAI 格式的 API 接口服务
  * 支持 /v1/chat/completions 端点，兼容 OpenAI SDK
  */
-@Path("/v1/chat/completions")
+@Component("/v1/chat/completions")
 public class OpenAIService implements Handler {
 
-    // 模拟的模型列表
-    private static final List<String> SUPPORTED_MODELS = Arrays.asList(
-            "gpt-3.5-turbo",
-            "gpt-4",
-            "gpt-4-turbo",
-            "custom-model"
-    );
+    // 注入 LlmProvider 实现
+    @Inject("openAiProvider")
+    private LlmProvider llmProvider;
 
     @Override
     public void callback(Context ctx) throws Exception {
@@ -119,8 +117,14 @@ public class OpenAIService implements Handler {
      * 处理非流式响应
      */
     private void handleNonStreamingResponse(Context ctx, ChatCompletionRequest request) throws Exception {
-        // 生成模拟响应
-        ChatCompletionResponse response = generateMockResponse(request);
+        // 转换为通用 ChatRequest
+        ChatRequest chatRequest = convertToChatRequest(request);
+        
+        // 调用 LlmProvider 生成响应
+        String reply = llmProvider.chatComplete(chatRequest);
+        
+        // 生成响应对象
+        ChatCompletionResponse response = buildResponse(request, reply);
         
         // 转换为 JSON 并发送
         String jsonResponse = responseToJson(response);
@@ -134,34 +138,21 @@ public class OpenAIService implements Handler {
         // 发送 SSE 响应头
         ctx.getResponse().sendSSEHeaders();
         
-        // 生成并发送流式响应块
-        streamMockResponse(ctx, request);
+        // 转换为通用 ChatRequest
+        ChatRequest chatRequest = convertToChatRequest(request);
+        
+        streamGeneratedResponse(ctx, request, chatRequest);
     }
 
     /**
-     * 生成模拟的非流式响应
+     * 构建响应对象
      */
-    private ChatCompletionResponse generateMockResponse(ChatCompletionRequest request) {
+    private ChatCompletionResponse buildResponse(ChatCompletionRequest request, String reply) {
         ChatCompletionResponse response = new ChatCompletionResponse();
         response.setId("chatcmpl-" + UUID.randomUUID().toString().replace("-", "").substring(0, 20));
         response.setObject("chat.completion");
         response.setCreated(System.currentTimeMillis() / 1000);
         response.setModel(request.getModel() != null ? request.getModel() : "gpt-3.5-turbo");
-        
-        // 获取最后一条用户消息
-        String lastUserMessage = "";
-        List<ChatCompletionRequest.Message> messages = request.getMessages();
-        if (messages != null && !messages.isEmpty()) {
-            for (int i = messages.size() - 1; i >= 0; i--) {
-                if ("user".equals(messages.get(i).getRole())) {
-                    lastUserMessage = messages.get(i).getContent();
-                    break;
-                }
-            }
-        }
-        
-        // 生成简单的回复
-        String reply = generateSimpleReply(lastUserMessage);
         
         ChatCompletionResponse.Choice choice = new ChatCompletionResponse.Choice();
         choice.setIndex(0);
@@ -176,6 +167,7 @@ public class OpenAIService implements Handler {
         
         // 设置 usage
         ChatCompletionResponse.Usage usage = new ChatCompletionResponse.Usage();
+        String lastUserMessage = getLastUserMessage(request.getMessages());
         usage.setPromptTokens(lastUserMessage.length());
         usage.setCompletionTokens(reply.length());
         usage.setTotalTokens(lastUserMessage.length() + reply.length());
@@ -185,31 +177,21 @@ public class OpenAIService implements Handler {
     }
 
     /**
-     * 流式发送模拟响应
+     * 流式发送生成的响应
      */
-    private void streamMockResponse(Context ctx, ChatCompletionRequest request) throws Exception {
+    private void streamGeneratedResponse(Context ctx, ChatCompletionRequest request, 
+                                         ChatRequest chatRequest) throws Exception {
         String chunkId = "chatcmpl-" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
         long created = System.currentTimeMillis() / 1000;
         String model = request.getModel() != null ? request.getModel() : "gpt-3.5-turbo";
         
-        // 获取最后一条用户消息
-        String lastUserMessage = "";
-        List<ChatCompletionRequest.Message> messages = request.getMessages();
-        if (messages != null && !messages.isEmpty()) {
-            for (int i = messages.size() - 1; i >= 0; i--) {
-                if ("user".equals(messages.get(i).getRole())) {
-                    lastUserMessage = messages.get(i).getContent();
-                    break;
-                }
-            }
-        }
+        // 使用 LlmProvider 的流式迭代
+        Iterator<String> streamIterator = llmProvider.chatCompleteStream(chatRequest);
         
-        String reply = generateSimpleReply(lastUserMessage);
-        
-        // 分块发送
-        String[] chunks = splitIntoChunks(reply, 5);
-        
-        for (int i = 0; i < chunks.length; i++) {
+        int index = 0;
+        while (streamIterator.hasNext()) {
+            String chunkContent = streamIterator.next();
+            
             ChatCompletionChunk chunk = new ChatCompletionChunk();
             chunk.setId(chunkId);
             chunk.setObject("chat.completion.chunk");
@@ -220,18 +202,13 @@ public class OpenAIService implements Handler {
             choice.setIndex(0);
             
             ChatCompletionChunk.Choice.Delta delta = new ChatCompletionChunk.Choice.Delta();
-            if (i == 0) {
+            if (index == 0) {
                 delta.setRole("assistant");
-                delta.setContent(chunks[i]);
-            } else {
-                delta.setContent(chunks[i]);
             }
+            delta.setContent(chunkContent);
             
             choice.setDelta(delta);
-            
-            if (i == chunks.length - 1) {
-                choice.setFinishReason("stop");
-            }
+            choice.setFinishReason(null); // 中间块不设置
             
             chunk.setChoices(new ChatCompletionChunk.Choice[]{choice});
             
@@ -240,48 +217,66 @@ public class OpenAIService implements Handler {
             ctx.getResponse().writeDirect("data: " + jsonChunk + "\n\n");
             
             // 模拟延迟
-            Thread.sleep(50);
+            Thread.sleep(30);
+            index++;
         }
+        
+        // 发送结束标记块
+        ChatCompletionChunk finalChunk = new ChatCompletionChunk();
+        finalChunk.setId(chunkId);
+        finalChunk.setObject("chat.completion.chunk");
+        finalChunk.setCreated(created);
+        finalChunk.setModel(model);
+        
+        ChatCompletionChunk.Choice finalChoice = new ChatCompletionChunk.Choice();
+        finalChoice.setIndex(0);
+        finalChoice.setFinishReason("stop");
+        finalChoice.setDelta(new ChatCompletionChunk.Choice.Delta());
+        
+        finalChunk.setChoices(new ChatCompletionChunk.Choice[]{finalChoice});
+        
+        String jsonFinalChunk = chunkToJson(finalChunk);
+        ctx.getResponse().writeDirect("data: " + jsonFinalChunk + "\n\n");
         
         // 发送结束标记
         ctx.getResponse().writeDirect("data: [DONE]\n\n");
     }
 
     /**
-     * 生成简单回复
+     * 转换为通用 ChatRequest
      */
-    private String generateSimpleReply(String userMessage) {
-        if (userMessage == null || userMessage.isEmpty()) {
-            return "Hello! I'm an AI assistant. How can I help you today?";
+    private ChatRequest convertToChatRequest(ChatCompletionRequest request) {
+        ChatRequest chatRequest = new ChatRequest();
+        chatRequest.setModel(request.getModel());
+        chatRequest.setStream(request.getStream());
+        chatRequest.setMaxTokens(request.getMaxTokens());
+        chatRequest.setTemperature(request.getTemperature());
+        
+        // 转换 messages
+        if (request.getMessages() != null) {
+            List<Message> messages = new ArrayList<>();
+            for (ChatCompletionRequest.Message msg : request.getMessages()) {
+                messages.add(new Message(msg.getRole(), msg.getContent()));
+            }
+            chatRequest.setMessages(messages);
         }
         
-        // 简单的回复逻辑
-        String lowerMessage = userMessage.toLowerCase();
-        if (lowerMessage.contains("hello") || lowerMessage.contains("hi")) {
-            return "Hello! How can I assist you today?";
-        } else if (lowerMessage.contains("help")) {
-            return "I'm here to help! What do you need assistance with?";
-        } else if (lowerMessage.contains("name")) {
-            return "I'm an AI assistant powered by this server.";
-        } else if (lowerMessage.contains("time")) {
-            return "Current time is: " + new Date();
-        } else if (lowerMessage.contains("date")) {
-            return "Today's date is: " + new Date();
-        }
-        
-        return "I received your message: \"" + userMessage + "\". This is a demo response from the OpenAI-compatible API server.";
+        return chatRequest;
     }
 
     /**
-     * 分割字符串为块
+     * 获取最后一条用户消息
      */
-    private String[] splitIntoChunks(String text, int chunkSize) {
-        List<String> chunks = new ArrayList<>();
-        int len = text.length();
-        for (int i = 0; i < len; i += chunkSize) {
-            chunks.add(text.substring(i, Math.min(len, i + chunkSize)));
+    private String getLastUserMessage(List<ChatCompletionRequest.Message> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return "";
         }
-        return chunks.toArray(new String[0]);
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            if ("user".equals(messages.get(i).getRole())) {
+                return messages.get(i).getContent() != null ? messages.get(i).getContent() : "";
+            }
+        }
+        return "";
     }
 
     /**

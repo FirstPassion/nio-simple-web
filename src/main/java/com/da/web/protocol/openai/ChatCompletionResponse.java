@@ -1,4 +1,4 @@
-package com.da.web.openai;
+package com.da.web.protocol.openai;
 
 /**
  * OpenAI 聊天响应模型（非流式）

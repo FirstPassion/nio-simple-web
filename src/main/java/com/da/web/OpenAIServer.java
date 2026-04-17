@@ -1,8 +1,6 @@
 package com.da.web;
 
 import com.da.web.core.DApp;
-import com.da.web.openai.OpenAIService;
-import com.da.web.openai.ModelService;
 import com.da.web.util.Logger;
 
 /**
@@ -27,12 +25,8 @@ public class OpenAIServer {
     
     public static void main(String[] args) {
         try {
-            // 创建应用实例，自动扫描并注册路由
+            // 创建应用实例，自动扫描并注册路由和组件
             DApp app = new DApp(OpenAIServer.class);
-            
-            // 手动注册 OpenAI 服务路由（如果 @Path 注解没有自动注册）
-            app.use("/v1/chat/completions", new OpenAIService());
-            app.use("/v1/models", new ModelService());
             
             // 启动服务器
             Logger.info(OpenAIServer.class, "正在启动 OpenAI 兼容 API 服务...");

@@ -443,36 +443,370 @@ public interface WsListener {
 }
 ```
 
+## LLM 协议支持
+
+项目支持多种 LLM 协议格式，包括 OpenAI 和 Anthropic，采用容器化依赖注入架构。
+
+### 架构设计
+
+```
+src/main/java/com/da/web/
+├── core/                    # 核心包（纯净）
+│   ├── LlmProvider.java     # LLM 提供者接口
+│   ├── Context.java         # 请求上下文
+│   └── DApp.java            # 服务器主类
+├── model/                   # 通用数据模型
+│   ├── ChatRequest.java     # 通用聊天请求
+│   ├── Message.java         # 消息模型
+│   └── ModelInfo.java       # 模型信息
+├── protocol/                # 协议实现层
+│   ├── openai/              # OpenAI 协议实现
+│   │   ├── OpenAiProvider.java    # 核心业务逻辑（@Component）
+│   │   ├── OpenAIService.java     # API 端点服务（@Component）
+│   │   ├── ModelService.java      # 模型列表服务（@Component）
+│   │   └── *.java           # 协议特定的 DTO 类
+│   └── anthropic/           # Anthropic 协议实现
+│       ├── AnthropicProvider.java # 核心业务逻辑（@Component）
+│       ├── AnthropicService.java  # API 端点服务（@Component）
+│       ├── ModelService.java      # 模型列表服务（@Component）
+│       └── *.java           # 协议特定的 DTO 类
+├── annotations/             # 注解定义
+│   ├── Component.java       # Bean 组件注解
+│   ├── Inject.java          # 依赖注入注解
+│   └── Path.java            # 路由路径注解
+└── bean/                    # Bean 容器管理
+    └── BeanContainer.java   # IOC 容器实现
+```
+
+### 核心设计理念
+
+1. **Core 包纯净原则**：只包含核心接口和基础设施，不包含具体业务实现
+2. **模型层独立**：通用 POJO 类放在 `model` 包，与核心逻辑分离
+3. **协议实现隔离**：每个协议在 `protocol/{name}` 目录下独立实现
+4. **全面容器化管理**：所有组件使用 `@Component` 注册，通过 `@Inject` 依赖注入
+5. **Provider-Service 分离**：
+   - `Provider`：核心业务逻辑，管理模型列表、生成响应
+   - `Service`：API 端点服务，处理 HTTP 请求/响应转换
+
+### OpenAI 协议示例
+
+#### 启动服务
+
+```java
+public class OpenAIServer {
+    public static void main(String[] args) {
+        // 自动扫描并注册所有 @Component 注解的类
+        DApp app = new DApp(OpenAIServer.class);
+        app.listen();
+    }
+}
+```
+
+#### Provider 实现（核心业务逻辑）
+
+```java
+@Component("openAiProvider")
+public class OpenAiProvider implements LlmProvider {
+    
+    private static final List<String> SUPPORTED_MODELS = Arrays.asList(
+        "gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"
+    );
+    
+    @Override
+    public List<ModelInfo> getModels() {
+        List<ModelInfo> models = new ArrayList<>();
+        for (String modelId : SUPPORTED_MODELS) {
+            models.add(new ModelInfo(modelId, "openai"));
+        }
+        return models;
+    }
+    
+    @Override
+    public String chatComplete(ChatRequest request) {
+        // 基于规则的智能响应生成
+        String userMessage = extractLastUserMessage(request);
+        return generateIntelligentResponse(userMessage);
+    }
+    
+    @Override
+    public Iterator<String> chatCompleteStream(ChatRequest request) {
+        String fullResponse = chatComplete(request);
+        return new ResponseIterator(fullResponse, 3);
+    }
+}
+```
+
+#### Service 实现（API 端点）
+
+```java
+@Component("/v1/chat/completions")
+public class OpenAIService implements Handler {
+    
+    // 依赖注入 Provider
+    @Inject("openAiProvider")
+    private LlmProvider llmProvider;
+    
+    @Override
+    public void callback(Context ctx) throws Exception {
+        if ("POST".equalsIgnoreCase(ctx.getMethod())) {
+            handleChatCompletion(ctx);
+        }
+    }
+    
+    private void handleChatCompletion(Context ctx) throws Exception {
+        ChatCompletionRequest request = parseRequest(ctx);
+        
+        // 转换为通用请求
+        ChatRequest chatRequest = convertToChatRequest(request);
+        
+        // 调用 Provider 生成响应
+        if (request.getStream()) {
+            handleStreamingResponse(ctx, chatRequest);
+        } else {
+            String reply = llmProvider.chatComplete(chatRequest);
+            sendJsonResponse(ctx, buildResponse(reply));
+        }
+    }
+}
+```
+
+#### 模型列表服务
+
+```java
+@Component("/v1/models")
+public class ModelService implements Handler {
+    
+    @Inject("openAiProvider")
+    private LlmProvider llmProvider;
+    
+    @Override
+    public void callback(Context ctx) throws Exception {
+        List<ModelInfo> models = llmProvider.getModels();
+        String json = modelsToJson(models);
+        ctx.sendJson(json);
+    }
+}
+```
+
+#### 测试示例
+
+```bash
+# 非流式请求
+curl http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-3.5-turbo",
+    "messages": [{"role": "user", "content": "你好"}]
+  }'
+
+# 流式请求
+curl http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-3.5-turbo",
+    "messages": [{"role": "user", "content": "你好"}],
+    "stream": true
+  }'
+
+# 获取模型列表
+curl http://localhost:8080/v1/models
+```
+
+### Anthropic 协议示例
+
+#### 启动服务
+
+```java
+public class AnthropicServer {
+    public static void main(String[] args) {
+        DApp app = new DApp(AnthropicServer.class);
+        app.listen();
+    }
+}
+```
+
+#### Provider 实现
+
+```java
+@Component("anthropicProvider")
+public class AnthropicProvider implements LlmProvider {
+    
+    private static final List<String> SUPPORTED_MODELS = Arrays.asList(
+        "claude-3-opus-20240229",
+        "claude-3-sonnet-20240229",
+        "claude-3-haiku-20240307",
+        "claude-2.1",
+        "claude-2.0"
+    );
+    
+    @Override
+    public List<ModelInfo> getModels() {
+        List<ModelInfo> models = new ArrayList<>();
+        for (String modelId : SUPPORTED_MODELS) {
+            models.add(new ModelInfo(modelId, "anthropic"));
+        }
+        return models;
+    }
+    
+    @Override
+    public String chatComplete(ChatRequest request) {
+        // Anthropic 风格的响应生成
+        return generateAnthropicResponse(request);
+    }
+}
+```
+
+#### Service 实现
+
+```java
+@Component("/v1/messages")
+public class AnthropicService implements Handler {
+    
+    @Inject("anthropicProvider")
+    private LlmProvider llmProvider;
+    
+    @Override
+    public void callback(Context ctx) throws Exception {
+        if ("POST".equalsIgnoreCase(ctx.getMethod())) {
+            handleMessages(ctx);
+        }
+    }
+}
+```
+
+#### 测试示例
+
+```bash
+# 非流式请求
+curl http://localhost:8080/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: test-key" \
+  -d '{
+    "model": "claude-3-sonnet-20240229",
+    "messages": [{"role": "user", "content": "你好"}],
+    "max_tokens": 100
+  }'
+
+# 流式请求
+curl http://localhost:8080/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: test-key" \
+  -d '{
+    "model": "claude-3-sonnet-20240229",
+    "messages": [{"role": "user", "content": "你好"}],
+    "max_tokens": 100,
+    "stream": true
+  }'
+```
+
+### 依赖注入详解
+
+#### @Component 注解
+
+注册 Bean 到容器：
+
+```java
+// 指定 Bean 名称
+@Component("myService")
+public class MyService implements Handler { }
+
+// 路径作为 Bean 名称（用于路由）
+@Component("/api/users")
+public class UserController implements Handler { }
+```
+
+#### @Inject 注解
+
+注入依赖：
+
+```java
+@Component("userService")
+public class UserService {
+    
+    // 注入指定的 Bean
+    @Inject("userRepository")
+    private UserRepository repository;
+    
+    // 注入基本类型（从配置或默认值）
+    @Inject("100")
+    private int maxUsers;
+    
+    // 注入字符串
+    @Inject("admin")
+    private String defaultRole;
+}
+```
+
+#### Bean 获取方式
+
+```java
+DApp app = new DApp(MyServer.class);
+
+// 通过名称获取 Bean
+MyService service = app.getBean("myService", MyService.class);
+
+// 通过路径获取 Bean（@Component 的路径作为名称）
+UserController controller = (UserController) app.getBean("/api/users");
+
+// 获取所有 Bean 名称
+Set<String> beanNames = app.getAllBeanNames();
+```
+
 ## 项目结构
 
 ```
 src/main/java/com/da/web/
 ├── annotations/          # 注解定义
-│   ├── Component.java
-│   ├── Inject.java
-│   └── Path.java
-├── bean/                 # Bean 容器
+│   ├── Component.java    # Bean 组件注解
+│   ├── Inject.java       # 依赖注入注解
+│   └── Path.java         # 路由路径注解
+├── bean/                 # Bean 容器管理
 │   └── BeanContainer.java
 ├── config/               # 配置管理
 │   └── ServerConfig.java
 ├── constant/             # 常量定义
 │   ├── HttpStatus.java
 │   └── ContentTypes.java
-├── core/                 # 核心类
+├── core/                 # 核心包（纯净）
 │   ├── DApp.java         # 服务器主类
-│   └── Context.java      # 请求上下文
+│   ├── Context.java      # 请求上下文
+│   └── LlmProvider.java  # LLM 提供者接口
+├── model/                # 通用数据模型
+│   ├── ChatRequest.java  # 通用聊天请求
+│   ├── Message.java      # 消息模型
+│   └── ModelInfo.java    # 模型信息
+├── protocol/             # 协议实现层
+│   ├── openai/           # OpenAI 协议实现
+│   │   ├── OpenAiProvider.java
+│   │   ├── OpenAIService.java
+│   │   ├── ModelService.java
+│   │   └── *.java        # 协议特定 DTO
+│   └── anthropic/        # Anthropic 协议实现
+│       ├── AnthropicProvider.java
+│       ├── AnthropicService.java
+│       ├── ModelService.java
+│       └── *.java        # 协议特定 DTO
 ├── enums/                # 枚举类型
 ├── exception/            # 异常处理
 ├── function/             # 函数式接口
 │   ├── Handler.java
 │   └── WsListener.java
+├── http/                 # HTTP 解析与处理
+│   ├── HttpRequest.java
+│   ├── HttpResponse.java
+│   ├── HttpParser.java
+│   ├── JsonParser.java
+│   └── MultiValueMap.java
 ├── io/                   # IO 相关
 │   └── StaticFileRegistry.java
 ├── router/               # 路由管理
 │   ├── RouteRegistry.java
 │   └── RouteMapping.java
+├── sse/                  # SSE（Server-Sent Events）支持
+│   └── SSEManager.java
 ├── util/                 # 工具类
-│   └── Utils.java
+│   ├── Utils.java
+│   └── Logger.java
 └── websocket/            # WebSocket 支持
     └── WebSocketManager.java
 ```
