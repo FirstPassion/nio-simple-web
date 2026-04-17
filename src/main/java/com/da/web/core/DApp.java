@@ -3,7 +3,6 @@ package com.da.web.core;
 import com.da.web.annotations.Component;
 import com.da.web.annotations.Inject;
 import com.da.web.annotations.Path;
-import com.da.web.enums.States;
 import com.da.web.function.Handler;
 import com.da.web.function.WsListener;
 import com.da.web.util.Utils;
@@ -59,6 +58,31 @@ public class DApp {
     private Properties properties = null;
     //    保存websocket的上下文
     public final static Map<SocketChannel, Context> wsContexts = new ConcurrentHashMap<>();
+
+    /**
+     * 处理 WebSocket 握手请求
+     */
+    private void handleWebSocketHandshake(SocketChannel channel, byte[] requestData) throws Exception {
+        String requestStr = new String(requestData, StandardCharsets.ISO_8859_1);
+        
+        // 提取 Sec-WebSocket-Key
+        String secWebSocketKey = null;
+        String[] lines = requestStr.split("\r\n");
+        for (String line : lines) {
+            if (line.toLowerCase().startsWith("sec-websocket-key:")) {
+                secWebSocketKey = line.substring(18).trim();
+                break;
+            }
+        }
+        
+        if (secWebSocketKey == null || secWebSocketKey.isEmpty()) {
+            throw new Exception("Missing Sec-WebSocket-Key");
+        }
+        
+        // 生成握手响应
+        String response = Utils.getHandShakeResponse(secWebSocketKey);
+        channel.write(ByteBuffer.wrap(response.getBytes(StandardCharsets.UTF_8)));
+    }
 
     /**
      * 空参构造不会扫描注入bean
@@ -281,7 +305,6 @@ public class DApp {
 //        jvm关闭的时候关闭循环和执行的线程,可以不用写这段,写了也无所谓
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             shutdown();
-            serverThread.stop();
         }));
     }
 
@@ -373,7 +396,7 @@ public class DApp {
         }
 //        找不到就是404
         else {
-            context.sendHtml("<h1 style='color: red;text-align: center;'>404 not found</h1><hr/>", States.NOT_FOUND.ordinal());
+            context.sendHtml("<h1 style='color: red;text-align: center;'>404 not found</h1><hr/>", 404);
         }
     }
 
