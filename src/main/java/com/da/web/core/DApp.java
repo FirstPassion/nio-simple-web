@@ -315,4 +315,18 @@ public class DApp {
     public RequestDispatcher getRequestDispatcher() {
         return requestDispatcher;
     }
+    
+    /**
+     * 获取路由注册表（用于测试）
+     */
+    public RouteRegistry getRouteRegistry() {
+        return routeRegistry;
+    }
+    
+    /**
+     * 停止服务器（用于测试）
+     */
+    public void stop() {
+        shutdown();
+    }
 }

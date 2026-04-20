@@ -13,7 +13,7 @@
 - 🍪 **Cookie/Session**: 内置 Cookie 操作和 Session 管理（30 分钟超时）
 - 🔄 **重定向**: 支持 302 临时重定向和 301 永久重定向
 - 📦 **参数绑定**: 自动绑定 `@PathParam`、`@QueryParam`、`@BodyParam`、`@Header`
-- 🧩 **IOC 容器**: 自动扫描 `@Component`、`@Path` 并注入依赖
+- 🧩 **IOC 容器**: 自动扫描 `@Component`、`@Path` 并注入依赖，支持无参构造和有参构造的依赖注入
 - 🌐 **WebSocket**: 完整的 WebSocket 支持
 - 📡 **SSE**: 服务端发送事件支持
 - 📄 **静态文件**: 内置静态文件服务
@@ -153,6 +153,54 @@ public class Main {
 }
 ```
 
+### 4. 依赖注入示例
+
+IOC 容器支持无参构造和有参构造的自动依赖注入：
+
+```java
+// 服务类
+@Component
+public class UserService {
+    public String getUserInfo() {
+        return "用户信息";
+    }
+}
+
+// 无参构造的 Controller（原有功能）
+@Path("/user")
+@Component
+public class UserController {
+    public UserController() {}
+    
+    @Get("/info")
+    public void getInfo(Context ctx) {
+        ctx.send("用户数据");
+    }
+}
+
+// 有参构造的 Controller（新增支持）
+@Path("/order")
+@Component
+public class OrderController {
+    private final UserService userService;
+    
+    // 容器会自动从 BeanContainer 中查找 UserService 类型的 Bean 并注入
+    public OrderController(UserService userService) {
+        this.userService = userService;
+    }
+    
+    @Get("/list")
+    public void listOrders(Context ctx) {
+        ctx.send(userService.getUserInfo());
+    }
+}
+```
+
+**实例化逻辑：**
+1. **优先尝试无参构造**：如果类有无参构造函数，直接实例化（保持向后兼容）
+2. **Fallback 到有参构造**：如果没有无参构造，遍历所有构造函数，尝试从 BeanContainer 中获取参数进行依赖注入
+3. **Bean 查找规则**：支持首字母小写的 bean 名、全名、类型匹配三种方式
+
 ## 📖 API 文档
 
 ### 注解说明
@@ -218,8 +266,35 @@ mvn clean compile
 # 运行所有测试
 mvn test
 
+# 运行特定测试类
+mvn test -Dtest=FullTest
+
 # 查看测试报告
 cat TEST_REPORT.md
+```
+
+### FullTest 综合测试
+
+`FullTest` 是一个完整的 JUnit 测试类，用于验证框架的所有核心功能：
+
+- **IOC 容器实例化测试**: 验证所有 Controller 类（包括无参构造和有参构造）能够成功实例化
+- **路由注册测试**: 分别测试 UserController、AuthController、ProductController、PageController、ApiController 的路由注解扫描和注册
+- **完整应用启动测试**: 验证 DApp 启动后路由正确注册（至少 20 条路由）
+- **路径变量提取测试**: 验证单个和多个路径变量的正确提取
+- **RequestMapping 注解测试**: 验证通用请求映射注解的功能
+
+```bash
+# 运行 FullTest 测试
+mvn test -Dtest=FullTest
+```
+
+测试输出示例：
+```
+[INFO] [ComponentScanner] 自动注册路由：GET /user/{id}
+[INFO] [ComponentScanner] 自动注册路由：GET /user/{id}/posts/{postId}
+...
+成功注册 40 条路由
+Tests run: 9, Failures: 0, Errors: 0, Skipped: 0
 ```
 
 ## ⚙️ 路由优先级
