@@ -82,13 +82,24 @@ public class DApp {
     }
     
     /**
-     * 请求注册处理
+     * 请求注册处理（默认 GET 方法）
      *
      * @param path    请求的路由路径
      * @param handler 对对应路由路径的处理
      */
     public void use(String path, Handler handler) {
-        routeRegistry.register(path, handler);
+        routeRegistry.register(path, "GET", handler);
+    }
+    
+    /**
+     * 请求注册处理（指定 HTTP 方法）
+     *
+     * @param path    请求的路由路径
+     * @param method  HTTP 方法（GET, POST, PUT, DELETE 等）
+     * @param handler 对对应路由路径的处理
+     */
+    public void use(String path, String method, Handler handler) {
+        routeRegistry.register(path, method, handler);
     }
     
     /**
@@ -247,6 +258,10 @@ public class DApp {
         }
         if (Utils.isNotBlank(beanName) && bean != null) {
             beanContainer.register(beanName, bean);
+            
+            // 注册@Path 类中带 HTTP 方法注解的路由
+            ComponentScanner scanner = new ComponentScanner("");
+            scanner.registerAnnotatedRoutes(bean, routeRegistry);
         }
     }
     
