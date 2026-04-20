@@ -1,7 +1,8 @@
 package com.da.web.http;
 
+import com.da.web.exception.HttpParseException;
 import org.junit.Test;
-import java.util.Map;
+
 import static org.junit.Assert.*;
 
 /**

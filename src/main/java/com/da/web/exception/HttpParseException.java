@@ -1,4 +1,4 @@
-package com.da.web.http;
+package com.da.web.exception;
 
 /**
  * HTTP 解析异常

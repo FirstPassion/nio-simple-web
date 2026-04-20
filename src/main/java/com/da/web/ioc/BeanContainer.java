@@ -1,4 +1,4 @@
-package com.da.web.bean;
+package com.da.web.ioc;
 
 import java.util.Map;
 import java.util.Optional;
@@ -34,7 +34,7 @@ public class BeanContainer {
     @SuppressWarnings("unchecked")
     public <T> T getBean(String name, Class<T> type) {
         Object bean = beans.get(name);
-        if (bean != null && type.isInstance(bean)) {
+        if (type.isInstance(bean)) {
             return (T) bean;
         }
         return null;

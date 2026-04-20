@@ -1,11 +1,11 @@
 package com.da.web.core;
 
-import com.da.web.bean.BeanContainer;
+import com.da.web.ioc.BeanContainer;
 import com.da.web.function.Handler;
 import com.da.web.function.WsListener;
-import com.da.web.http.HttpParser;
 import com.da.web.http.HttpRequest;
 import com.da.web.io.StaticFileRegistry;
+import com.da.web.ioc.DependencyInjector;
 import com.da.web.router.RouteRegistry;
 import com.da.web.util.Logger;
 import com.da.web.util.Utils;

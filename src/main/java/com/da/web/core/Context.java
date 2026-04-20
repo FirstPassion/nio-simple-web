@@ -34,7 +34,7 @@ public class Context {
         HttpRequest tempRequest = null;
         HttpResponse tempResponse = null;
         try {
-            // 使用新的 HTTP 解析器解析请求
+            // 使用 HTTP 解析器解析请求
             tempRequest = HttpParser.readAndParse(channel);
             tempResponse = new HttpResponse(channel, tempRequest.getHttpVersion());
             printRequestInfo(tempRequest, tempResponse);
@@ -76,14 +76,14 @@ public class Context {
     }
 
     /**
-     * 获取 URL 查询参数（兼容旧 API）
+     * 获取 URL 查询参数
      */
     public Map<String, Object> getParams() {
         return request != null ? request.getQueryParams() : null;
     }
 
     /**
-     * 获取请求体参数（新增）
+     * 获取请求体参数
      */
     public Map<String, Object> getBodyParams() {
         return request != null ? request.getBodyParams() : null;
@@ -166,7 +166,7 @@ public class Context {
     }
 
     /**
-     * 发送响应（使用新的 HttpResponse）
+     * 发送响应（HttpResponse）
      */
     public void send(String headers, int code, String data) {
         try {

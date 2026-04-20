@@ -1,11 +1,9 @@
 package com.da.web.core;
 
 import com.da.web.annotations.Component;
-import com.da.web.annotations.Inject;
 import com.da.web.annotations.Path;
-import com.da.web.bean.BeanContainer;
+import com.da.web.ioc.BeanContainer;
 import com.da.web.function.Handler;
-import com.da.web.function.WsListener;
 import com.da.web.ioc.BeanConfig;
 import com.da.web.ioc.ComponentScanner;
 import com.da.web.ioc.DependencyInjector;
@@ -17,8 +15,6 @@ import com.da.web.util.Utils;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Method;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.channels.*;
@@ -141,7 +137,6 @@ public class DApp {
      * @param t        要转成的类型
      * @return 转好类型的 bean
      */
-    @SuppressWarnings("unchecked")
     public <T> T getBean(String beanName, Class<T> t) {
         return beanContainer.getBean(beanName, t);
     }
@@ -239,7 +234,6 @@ public class DApp {
         }
     }
     
-    @SuppressWarnings("unchecked")
     private void registerBean(Class<?> clz) {
         String beanName = "";
         Object bean = null;
@@ -250,48 +244,9 @@ public class DApp {
         } else if (clz.isAnnotationPresent(Path.class)) {
             beanName = clz.getAnnotation(Path.class).value();
             bean = Utils.newInstance(clz);
-        } else if (hasMapperAnnotation(clz)) {
-            bean = createMapperProxy(clz);
-            if (bean != null) {
-                beanName = clz.getSimpleName();
-            }
         }
-        
         if (Utils.isNotBlank(beanName) && bean != null) {
             beanContainer.register(beanName, bean);
-        }
-    }
-    
-    private boolean hasMapperAnnotation(Class<?> clz) {
-        if (!Utils.isReadExist("com.da.orm.annotation.Mapper")) {
-            return false;
-        }
-        try {
-            Class<Annotation> mapper = (Class<Annotation>) Class.forName("com.da.orm.annotation.Mapper");
-            return clz.isAnnotationPresent(mapper);
-        } catch (Exception e) {
-            Logger.error(DApp.class, e);
-            return false;
-        }
-    }
-    
-    private Object createMapperProxy(Class<?> clz) {
-        try {
-            if (!Utils.isReadExist("com.da.orm.core.MapperProxyFactory")) {
-                return null;
-            }
-            
-            Class<?> mapperProxyFactoryClz = Class.forName("com.da.orm.core.MapperProxyFactory");
-            Object instance = mapperProxyFactoryClz.getConstructor().newInstance();
-            Method getMapper = mapperProxyFactoryClz.getDeclaredMethod("getMapper", Class.class);
-            getMapper.setAccessible(true);
-            Object proxy = getMapper.invoke(instance, clz);
-            getMapper.setAccessible(false);
-            
-            return proxy;
-        } catch (Exception e) {
-            Logger.error(DApp.class, e);
-            return null;
         }
     }
     
@@ -340,5 +295,9 @@ public class DApp {
             Logger.error(DApp.class, e);
         }
         return "";
+    }
+
+    public RequestDispatcher getRequestDispatcher() {
+        return requestDispatcher;
     }
 }

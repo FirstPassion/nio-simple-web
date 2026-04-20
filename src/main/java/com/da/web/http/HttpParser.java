@@ -1,5 +1,7 @@
 package com.da.web.http;
 
+import com.da.web.exception.HttpParseException;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -52,26 +54,39 @@ public class HttpParser {
         ByteBuffer buffer = ByteBuffer.allocate(1024);
         
         int bytesRead;
-        while ((bytesRead = channel.read(buffer)) > 0) {
-            buffer.flip();
-            byte[] data = new byte[bytesRead];
-            buffer.get(data);
-            baos.write(data);
+        boolean hasData = false;
+        while (true) {
+            bytesRead = channel.read(buffer);
             
-            // 检查是否已读取完整的 HTTP 请求
-            byte[] currentData = baos.toByteArray();
-            if (isCompleteRequest(currentData)) {
+            if (bytesRead > 0) {
+                hasData = true;
+                buffer.flip();
+                byte[] data = new byte[bytesRead];
+                buffer.get(data);
+                baos.write(data);
+                
+                // 检查是否已读取完整的 HTTP 请求
+                byte[] currentData = baos.toByteArray();
+                if (isCompleteRequest(currentData)) {
+                    break;
+                }
+                
+                // 扩容缓冲区
+                if (buffer.remaining() < 64) {
+                    buffer = ByteBuffer.allocate(buffer.capacity() * 2);
+                } else {
+                    buffer.clear();
+                }
+            } else if (bytesRead == -1 || (bytesRead == 0 && hasData)) {
+                // 连接关闭或没有更多数据
                 break;
             }
-            
-            // 扩容缓冲区
-            if (buffer.remaining() < 64) {
-                buffer = ByteBuffer.allocate(buffer.capacity() * 2);
-            } else {
-                buffer.clear();
-            }
+            // bytesRead == 0 且没有数据，继续等待
         }
         
+        if (!hasData) {
+            return new byte[0];
+        }
         return baos.toByteArray();
     }
 
@@ -131,7 +146,7 @@ public class HttpParser {
      */
     private static void parseRequestLine(ParserContext ctx, HttpRequest request) throws HttpParseException {
         String line = readLine(ctx);
-        if (line == null || line.isEmpty()) {
+        if (line.isEmpty()) {
             throw new HttpParseException("Empty request line");
         }
 

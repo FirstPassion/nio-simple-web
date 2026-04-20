@@ -1,7 +1,6 @@
 package com.da.web.ioc;
 
 import com.da.web.annotations.Inject;
-import com.da.web.bean.BeanContainer;
 import com.da.web.core.Context;
 import com.da.web.util.Logger;
 import com.da.web.util.Utils;
@@ -75,16 +74,13 @@ public class DependencyInjector {
         }
         // Bean 引用注入
         else if (beanContainer.containsBean(beanNameOrValue)) {
-            Object targetBean = beanContainer.getBean(beanNameOrValue).orElse(null);
-            if (targetBean != null) {
-                setFieldAccessible(field, bean, () -> {
-                    try {
-                        field.set(bean, targetBean);
-                    } catch (IllegalAccessException e) {
-                        logInjectionError(field, bean, e, context);
-                    }
-                });
-            }
+            beanContainer.getBean(beanNameOrValue).ifPresent(targetBean -> setFieldAccessible(field, bean, () -> {
+                try {
+                    field.set(bean, targetBean);
+                } catch (IllegalAccessException e) {
+                    logInjectionError(field, bean, e, context);
+                }
+            }));
         }
     }
     

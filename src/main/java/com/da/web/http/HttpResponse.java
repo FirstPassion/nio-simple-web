@@ -166,15 +166,14 @@ public class HttpResponse {
      */
     public void sendSSEHeaders() throws IOException {
         // 构建 SSE 响应头
-        StringBuilder response = new StringBuilder();
-        response.append(httpVersion).append(" ").append(statusCode).append("\r\n");
-        response.append("Content-Type: text/event-stream;charset=UTF-8\r\n");
-        response.append("Cache-Control: no-cache\r\n");
-        response.append("Connection: keep-alive\r\n");
-        response.append("Access-Control-Allow-Origin: *\r\n");
-        response.append("\r\n");
+        String response = httpVersion + " " + statusCode + "\r\n" +
+                "Content-Type: text/event-stream;charset=UTF-8\r\n" +
+                "Cache-Control: no-cache\r\n" +
+                "Connection: keep-alive\r\n" +
+                "Access-Control-Allow-Origin: *\r\n" +
+                "\r\n";
 
-        ByteBuffer buffer = ByteBuffer.wrap(response.toString().getBytes(StandardCharsets.UTF_8));
+        ByteBuffer buffer = ByteBuffer.wrap(response.getBytes(StandardCharsets.UTF_8));
         channel.write(buffer);
         // 注意：这里不关闭连接，保持长连接用于流式传输
     }
