@@ -7,10 +7,11 @@ import com.da.web.io.StaticFileRegistry;
 
 import java.io.File;
 import java.util.Optional;
+import java.util.Map;
 
 /**
  * 请求分发器，统一处理路由匹配逻辑
- * 匹配顺序：routes → staticFiles → beans
+ * 匹配顺序：手动注册路由 → 注解路由 → staticFiles → beans
  */
 public class RequestDispatcher {
     
@@ -31,11 +32,20 @@ public class RequestDispatcher {
      */
     public void dispatch(Context context) throws Exception {
         String url = context.getUrl();
+        String method = context.getMethod();
         
-        // 1. 优先匹配显式注册的路由
-        Optional<Handler> routeHandler = routeRegistry.getHandler(url);
-        if (routeHandler.isPresent()) {
-            routeHandler.get().callback(context);
+        // 1. 优先匹配显式注册的路由（包括 HTTP 方法匹配）
+        Optional<RouteMapping> routeMapping = routeRegistry.getRouteMapping(url, method);
+        if (routeMapping.isPresent()) {
+            RouteMapping mapping = routeMapping.get();
+            
+            // 提取路径变量并设置到 Context
+            if (mapping.hasPathVariables()) {
+                Map<String, String> pathVariables = mapping.extractPathVariables(url);
+                context.setPathVariables(pathVariables);
+            }
+            
+            mapping.getHandler().callback(context);
             return;
         }
         
@@ -63,7 +73,7 @@ public class RequestDispatcher {
      * 检查是否存在对应的路由
      */
     public boolean hasRoute(String url) {
-        return routeRegistry.hasRoute(url) || 
+        return routeRegistry.hasRoute(url, "GET") || 
                staticFileRegistry.hasFile(url) || 
                beanContainer.containsBean(url);
     }

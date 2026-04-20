@@ -190,32 +190,9 @@ public class Worker implements Runnable {
      * 分发请求到对应的处理器
      */
     private void dispatchRequest(Context context) throws Exception {
-        String url = context.getUrl();
-        
-        // 1. 优先匹配显式注册的路由
-        if (routeRegistry.hasRoute(url)) {
-            routeRegistry.getHandler(url).get().callback(context);
-            return;
-        }
-        
-        // 2. 匹配静态资源
-        if (staticFileRegistry.hasFile(url)) {
-            context.send(staticFileRegistry.getFile(url).get());
-            return;
-        }
-        
-        // 3. 匹配 Bean（@Path 注解的类）
-        if (beanContainer.containsBean(url)) {
-            Object bean = beanContainer.getBean(url).get();
-            if (bean instanceof Handler) {
-                // 给 Path Bean 注入属性
-                dependencyInjector.injectToPathBean(bean, context);
-                ((Handler) bean).callback(context);
-                return;
-            }
-        }
-        
-        // 4. 未找到，返回 404
-        context.sendHtml("<h1 style='color: red;text-align: center;'>404 not found</h1><hr/>", 404);
+        // 使用 RequestDispatcher 统一处理路由分发
+        com.da.web.router.RequestDispatcher dispatcher = 
+            new com.da.web.router.RequestDispatcher(routeRegistry, beanContainer, staticFileRegistry);
+        dispatcher.dispatch(context);
     }
 }
