@@ -147,22 +147,33 @@ public class ComponentScanner {
         Path pathAnnotation = clazz.getAnnotation(Path.class);
         String classPath = pathAnnotation.value();
         
-        // 遍历所有公共方法
-        for (Method method : clazz.getMethods()) {
-            registerMethodRoute(beanInstance, classPath, method, routeRegistry);
-        }
+        // 使用 Set 记录已注册的方法签名，避免重复注册
+        java.util.Set<String> registeredMethods = new java.util.HashSet<>();
         
-        // 也检查声明的方法（包括非公共方法）
-        for (Method method : clazz.getDeclaredMethods()) {
-            registerMethodRoute(beanInstance, classPath, method, routeRegistry);
+        // 遍历所有公共方法（getMethods 会返回父类的公共方法）
+        for (Method method : clazz.getMethods()) {
+            // 只处理当前类声明的方法，跳过继承自 Object 等父类的方法
+            if (method.getDeclaringClass() == Object.class) {
+                continue;
+            }
+            if (registerMethodRoute(beanInstance, classPath, method, routeRegistry, registeredMethods)) {
+                // 已成功注册
+            }
         }
     }
     
     /**
      * 注册单个方法的路由
      */
-    private void registerMethodRoute(Object beanInstance, String classPath, Method method, 
-                                     com.da.web.router.RouteRegistry routeRegistry) {
+    private boolean registerMethodRoute(Object beanInstance, String classPath, Method method, 
+                                     com.da.web.router.RouteRegistry routeRegistry,
+                                     java.util.Set<String> registeredMethods) {
+        // 生成方法签名用于去重
+        String methodSignature = method.getName() + ":" + method.toGenericString();
+        if (!registeredMethods.add(methodSignature)) {
+            return false; // 已注册过，跳过
+        }
+        
         String methodPath = null;
         String httpMethod = "GET";
         
@@ -202,7 +213,7 @@ public class ComponentScanner {
         
         // 如果没有找到任何路由注解，跳过
         if (methodPath == null) {
-            return;
+            return false;
         }
         
         // 组合完整路径
@@ -227,6 +238,7 @@ public class ComponentScanner {
         // 注册路由
         routeRegistry.register(fullPath, httpMethod, handler);
         Logger.info(ComponentScanner.class, "自动注册路由：" + httpMethod + " " + fullPath);
+        return true;
     }
     
     /**
@@ -327,5 +339,22 @@ public class ComponentScanner {
         }
         
         return value;
+    }
+    
+    /**
+     * 实例化 Controller 类（用于测试）
+     * 支持无参构造和有参构造的依赖注入
+     * @param controllerClass Controller 类
+     * @return 实例化的 Controller 对象
+     */
+    public <T> T instantiateController(Class<T> controllerClass) {
+        try {
+            // 创建 BeanContainer 用于依赖注入
+            BeanContainer beanContainer = new BeanContainer();
+            // 使用 Utils.newInstance 进行实例化（支持有参构造）
+            return controllerClass.cast(Utils.newInstance(controllerClass, beanContainer));
+        } catch (Exception e) {
+            throw new RuntimeException("实例化 Controller 失败：" + controllerClass.getName(), e);
+        }
     }
 }

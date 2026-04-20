@@ -225,18 +225,102 @@ public class Utils {
 
     /**
      * 通过加载的类来实例化对象
+     * 优先使用无参构造，如果没有无参构造则尝试使用有参构造（参数从 BeanContainer 获取）
      *
-     * @param clz 要实例化的Class
-     * @return 实例化好的Class
+     * @param clz 要实例化的 Class
+     * @return 实例化好的 Class
      */
     public static Object newInstance(Class<?> clz) {
+        return newInstance(clz, null);
+    }
+
+    /**
+     * 通过加载的类来实例化对象，支持依赖注入
+     * 优先使用无参构造，如果没有无参构造则尝试使用有参构造（参数从 BeanContainer 获取）
+     *
+     * @param clz 要实例化的 Class
+     * @param beanContainer Bean 容器，用于获取构造函数参数
+     * @return 实例化好的 Class
+     */
+    public static Object newInstance(Class<?> clz, com.da.web.ioc.BeanContainer beanContainer) {
         Object o = null;
         try {
-            o = clz.getConstructor().newInstance();
+            // 1. 首先尝试无参构造
+            try {
+                java.lang.reflect.Constructor<?> constructor = clz.getDeclaredConstructor();
+                constructor.setAccessible(true);
+                o = constructor.newInstance();
+                return o;
+            } catch (NoSuchMethodException e) {
+                // 没有无参构造，继续尝试有参构造
+            }
+
+            // 2. 如果没有无参构造，尝试使用有参构造进行依赖注入
+            if (beanContainer != null) {
+                // 遍历所有构造函数，找到一个所有参数都能从容器中获取的构造函数
+                for (java.lang.reflect.Constructor<?> constructor : clz.getDeclaredConstructors()) {
+                    constructor.setAccessible(true);
+                    Class<?>[] paramTypes = constructor.getParameterTypes();
+                    Object[] params = new Object[paramTypes.length];
+                    boolean canInstantiate = true;
+
+                    for (int i = 0; i < paramTypes.length; i++) {
+                        // 尝试从 BeanContainer 获取对应类型的 Bean
+                        Object paramBean = findBeanByType(beanContainer, paramTypes[i]);
+                        if (paramBean == null) {
+                            canInstantiate = false;
+                            break;
+                        }
+                        params[i] = paramBean;
+                    }
+
+                    if (canInstantiate) {
+                        o = constructor.newInstance(params);
+                        break;
+                    }
+                }
+            }
+
+            if (o == null) {
+                Logger.error(Utils.class, 
+                    "无法实例化类 " + clz.getName() + 
+                    ": 没有找到合适的构造函数（无参构造或所有参数都能从 BeanContainer 获取的有参构造）");
+            }
         } catch (Exception e) {
             Logger.error(Utils.class, e);
         }
         return o;
+    }
+
+    /**
+     * 根据类型从 BeanContainer 中查找 Bean
+     */
+    private static Object findBeanByType(com.da.web.ioc.BeanContainer beanContainer, Class<?> type) {
+        // 直接按类型名称查找
+        String beanName = type.getSimpleName();
+        // 首字母小写
+        if (beanName.length() > 0) {
+            beanName = Character.toLowerCase(beanName.charAt(0)) + beanName.substring(1);
+        }
+        
+        if (beanContainer.containsBean(beanName)) {
+            return beanContainer.getBean(beanName).orElse(null);
+        }
+        
+        // 尝试按类型全名查找
+        if (beanContainer.containsBean(type.getName())) {
+            return beanContainer.getBean(type.getName()).orElse(null);
+        }
+        
+        // 遍历所有 Bean，查找匹配类型的
+        for (String name : beanContainer.getBeanNames()) {
+            Object bean = beanContainer.getBean(name).orElse(null);
+            if (bean != null && type.isInstance(bean)) {
+                return bean;
+            }
+        }
+        
+        return null;
     }
 
     /**

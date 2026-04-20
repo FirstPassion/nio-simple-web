@@ -118,4 +118,11 @@ public class RouteRegistry {
     public List<RouteMapping> getAllRoutes() {
         return new ArrayList<>(routes);
     }
+    
+    /**
+     * 获取路由数量（用于测试）
+     */
+    public int getRouteCount() {
+        return routes.size();
+    }
 }

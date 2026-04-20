@@ -12,9 +12,9 @@ target/
 .mypy_cache/
 .pytest_cache/
 __pycache__/
-coverage/
-htmlcov/
-*.coverage
+node_modules/
+venv/
+.venv/
 
 # Logs and temp files
 *.log
@@ -30,7 +30,12 @@ htmlcov/
 .vscode/
 .idea/
 
-# System files
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# System
 .DS_Store
 Thumbs.db
 ```
