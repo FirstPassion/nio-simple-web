@@ -1,12 +1,8 @@
 package com.da.web.core;
 
-import com.da.web.ioc.BeanContainer;
 import com.da.web.function.Handler;
 import com.da.web.function.WsListener;
 import com.da.web.http.HttpRequest;
-import com.da.web.io.StaticFileRegistry;
-import com.da.web.ioc.DependencyInjector;
-import com.da.web.router.RouteRegistry;
 import com.da.web.util.Logger;
 import com.da.web.util.Utils;
 
@@ -31,22 +27,12 @@ public class Worker implements Runnable {
     private volatile boolean started = false;
     private ConcurrentLinkedQueue<Runnable> queue;
     
-    // 依赖组件
-    private final RouteRegistry routeRegistry;
-    private final BeanContainer beanContainer;
-    private final StaticFileRegistry staticFileRegistry;
-    private final DependencyInjector dependencyInjector;
+    // 依赖组件：使用 DispatcherServlet 统一处理请求
+    private final DispatcherServlet dispatcherServlet;
     
-    public Worker(String name, 
-                  RouteRegistry routeRegistry,
-                  BeanContainer beanContainer,
-                  StaticFileRegistry staticFileRegistry,
-                  DependencyInjector dependencyInjector) {
+    public Worker(String name, DispatcherServlet dispatcherServlet) {
         this.name = name;
-        this.routeRegistry = routeRegistry;
-        this.beanContainer = beanContainer;
-        this.staticFileRegistry = staticFileRegistry;
-        this.dependencyInjector = dependencyInjector;
+        this.dispatcherServlet = dispatcherServlet;
     }
     
     /**
@@ -157,7 +143,7 @@ public class Worker implements Runnable {
             return;
         }
         
-        // 分发请求
+        // 分发请求（带异常处理）
         dispatchRequest(context);
     }
     
@@ -187,12 +173,10 @@ public class Worker implements Runnable {
     }
     
     /**
-     * 分发请求到对应的处理器
+     * 分发请求到 DispatcherServlet（带异常捕获）
      */
-    private void dispatchRequest(Context context) throws Exception {
-        // 使用 RequestDispatcher 统一处理路由分发
-        com.da.web.router.RequestDispatcher dispatcher = 
-            new com.da.web.router.RequestDispatcher(routeRegistry, beanContainer, staticFileRegistry);
-        dispatcher.dispatch(context);
+    private void dispatchRequest(Context context) {
+        // 委托给 DispatcherServlet 处理（内部已有异常处理）
+        dispatcherServlet.handle(context);
     }
 }

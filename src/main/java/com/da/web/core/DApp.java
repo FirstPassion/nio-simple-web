@@ -44,20 +44,15 @@ public class DApp {
     private final BeanContainer beanContainer;
     private final RouteRegistry routeRegistry;
     private final StaticFileRegistry staticFileRegistry;
-    private RequestDispatcher requestDispatcher;
+    private DispatcherServlet dispatcherServlet;
     private DependencyInjector dependencyInjector;
+    private final Class<?> startupClass;
     
     /**
      * 空参构造不会扫描注入 bean
      */
     public DApp() {
-        this.startTime = System.currentTimeMillis();
-        this.beanContainer = new BeanContainer();
-        this.routeRegistry = new RouteRegistry();
-        this.staticFileRegistry = new StaticFileRegistry();
-        
-        getAndParseConfig();
-        scanStaticFiles();
+        this(null);
     }
     
     /**
@@ -65,20 +60,25 @@ public class DApp {
      */
     public DApp(Class<?> clz) {
         this.startTime = System.currentTimeMillis();
+        this.startupClass = clz;
         this.beanContainer = new BeanContainer();
         this.routeRegistry = new RouteRegistry();
         this.staticFileRegistry = new StaticFileRegistry();
         
         getAndParseConfig();
         scanStaticFiles();
-        initScan(clz);
         
-        // 初始化依赖注入器和请求分发器
-        this.dependencyInjector = new DependencyInjector(beanContainer);
-        this.requestDispatcher = new RequestDispatcher(routeRegistry, beanContainer, staticFileRegistry);
-        
-        // 给 Component Bean 注入属性
-        injectToComponentBeans();
+        if (clz != null) {
+            initScan(clz);
+            
+            // 初始化依赖注入器
+            this.dependencyInjector = new DependencyInjector(beanContainer);
+            // 初始化调度中心（包含异常处理和路由分发）
+            this.dispatcherServlet = new DispatcherServlet(routeRegistry, beanContainer, staticFileRegistry);
+            
+            // 给 Component Bean 注入属性
+            injectToComponentBeans();
+        }
     }
     
     /**
@@ -116,6 +116,11 @@ public class DApp {
      */
     public void listen(int port) {
         System.setProperty("java.awt.headless", Boolean.toString(true));
+        
+        // 注入启动类的静态字段（解决用户类未标记@Component 但需要注入的问题）
+        if (dependencyInjector != null && startupClass != null) {
+            dependencyInjector.injectStaticFields(startupClass);
+        }
         
         Thread serverThread = new Thread(() -> start0(port));
         isStart = !serverThread.isAlive();
@@ -181,7 +186,7 @@ public class DApp {
         
         // 创建 Worker 线程
         IntStream.range(0, workerNum).forEach(i -> 
-            workers[i] = new Worker("worker-" + i, routeRegistry, beanContainer, staticFileRegistry, dependencyInjector)
+            workers[i] = new Worker("worker-" + i, dispatcherServlet)
         );
         
         AtomicInteger robin = new AtomicInteger(0);
@@ -319,8 +324,8 @@ public class DApp {
         return "";
     }
 
-    public RequestDispatcher getRequestDispatcher() {
-        return requestDispatcher;
+    public DispatcherServlet getDispatcherServlet() {
+        return dispatcherServlet;
     }
     
     /**
