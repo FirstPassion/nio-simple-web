@@ -1,7 +1,9 @@
 package com.da.web.ioc;
 
 import com.da.web.annotations.Inject;
+import com.da.web.annotations.Configuration;
 import com.da.web.core.Context;
+import com.da.web.core.PropertiesConfigLoader;
 import com.da.web.util.Logger;
 import com.da.web.util.Utils;
 
@@ -15,9 +17,11 @@ import java.util.function.Function;
 public class DependencyInjector {
     
     private final BeanContainer beanContainer;
+    private final PropertiesConfigLoader configLoader;
     
     public DependencyInjector(BeanContainer beanContainer) {
         this.beanContainer = beanContainer;
+        this.configLoader = new PropertiesConfigLoader();
     }
     
     /**
@@ -25,6 +29,11 @@ public class DependencyInjector {
      */
     public void injectToComponentBean(Object bean) {
         Class<?> clz = bean.getClass();
+        
+        // 如果类有@Configuration 注解，从 YAML 配置注入
+        if (clz.isAnnotationPresent(Configuration.class)) {
+            configLoader.injectToConfig(bean);
+        }
         
         for (Field field : clz.getDeclaredFields()) {
             if (field.isAnnotationPresent(Inject.class)) {

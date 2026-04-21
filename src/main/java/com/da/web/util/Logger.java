@@ -60,6 +60,11 @@ public class Logger {
         log(clazz, "INFO", msg);
     }
 
+    public static void debug(Class<?> clazz, String msg) {
+        if (!enabled) return;
+        log(clazz, "DEBUG", msg);
+    }
+
     public static void setEnabled(boolean enabled) {
         Logger.enabled = enabled;
     }
