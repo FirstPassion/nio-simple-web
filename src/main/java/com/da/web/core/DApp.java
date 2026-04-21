@@ -255,6 +255,13 @@ public class DApp {
         } else if (clz.isAnnotationPresent(Path.class)) {
             beanName = clz.getAnnotation(Path.class).value();
             bean = Utils.newInstance(clz);
+        } else if (clz.isAnnotationPresent(com.da.web.annotations.Configuration.class)) {
+            // 支持@Configuration 配置类
+            com.da.web.annotations.Configuration configAnno = 
+                clz.getAnnotation(com.da.web.annotations.Configuration.class);
+            beanName = configAnno.prefix().isEmpty() ? 
+                clz.getSimpleName() : configAnno.prefix() + "Config";
+            bean = Utils.newInstance(clz);
         }
         if (Utils.isNotBlank(beanName) && bean != null) {
             beanContainer.register(beanName, bean);
