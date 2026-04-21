@@ -8,11 +8,12 @@ import com.da.web.util.Logger;
 import com.da.web.util.Utils;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.Map;
 import java.util.function.Function;
 
 /**
- * 依赖注入器，统一处理@Inject 注解的字段注入
+ * 依赖注入器，统一处理@Inject 注解的字段注入（支持实例字段和静态字段）
  */
 public class DependencyInjector {
     
@@ -35,10 +36,30 @@ public class DependencyInjector {
             configLoader.injectToConfig(bean);
         }
         
+        // 注入实例字段
         for (Field field : clz.getDeclaredFields()) {
-            if (field.isAnnotationPresent(Inject.class)) {
+            if (!Modifier.isStatic(field.getModifiers()) && field.isAnnotationPresent(Inject.class)) {
                 String beanNameOrValue = field.getAnnotation(Inject.class).value();
                 injectFieldValue(field, beanNameOrValue, bean, null);
+            }
+        }
+    }
+    
+    /**
+     * 注入静态字段（用于未标记@Component 但需要注入的类）
+     */
+    public void injectStaticFields(Class<?> clazz) {
+        if (clazz == null || clazz == Object.class) {
+            return;
+        }
+        
+        // 递归处理父类
+        injectStaticFields(clazz.getSuperclass());
+        
+        for (Field field : clazz.getDeclaredFields()) {
+            if (Modifier.isStatic(field.getModifiers()) && field.isAnnotationPresent(Inject.class)) {
+                String beanNameOrValue = field.getAnnotation(Inject.class).value();
+                injectStaticFieldValue(field, beanNameOrValue);
             }
         }
     }
@@ -61,6 +82,39 @@ public class DependencyInjector {
                 String value = (String) params.get(field.getName());
                 injectFromRequestParam(field, value, bean, context);
             }
+        }
+    }
+    
+    /**
+     * 注入静态字段值（基本类型或 Bean 引用）
+     */
+    private void injectStaticFieldValue(Field field, String beanNameOrValue) {
+        Function<String, Object> conv = Utils.getTypeConv(field.getType().getName());
+        
+        // 基本类型和 String
+        if (conv != null) {
+            setStaticFieldAccessible(field, () -> {
+                try {
+                    Object value = conv.apply(beanNameOrValue);
+                    field.set(null, value);
+                } catch (Exception e) {
+                    logStaticInjectionError(field, e);
+                }
+            });
+        }
+        // Bean 引用注入
+        else if (beanContainer.containsBean(beanNameOrValue)) {
+            beanContainer.getBean(beanNameOrValue).ifPresent(targetBean -> setStaticFieldAccessible(field, () -> {
+                try {
+                    field.set(null, targetBean);
+                } catch (IllegalAccessException e) {
+                    logStaticInjectionError(field, e);
+                }
+            }));
+        } else {
+            // Bean 不存在，记录错误但不抛出异常（允许可选依赖）
+            Logger.error(DependencyInjector.class, 
+                "注入失败：静态字段 " + field.getName() + " 找不到 Bean: " + beanNameOrValue);
         }
     }
     
@@ -112,7 +166,7 @@ public class DependencyInjector {
     }
     
     /**
-     * 设置字段可访问并执行注入操作
+     * 设置字段可访问并执行注入操作（实例字段）
      */
     private void setFieldAccessible(Field field, Object bean, Runnable injectAction) {
         field.setAccessible(true);
@@ -124,7 +178,19 @@ public class DependencyInjector {
     }
     
     /**
-     * 记录注入错误日志
+     * 设置静态字段可访问并执行注入操作
+     */
+    private void setStaticFieldAccessible(Field field, Runnable injectAction) {
+        field.setAccessible(true);
+        try {
+            injectAction.run();
+        } finally {
+            field.setAccessible(false);
+        }
+    }
+    
+    /**
+     * 记录注入错误日志（实例字段）
      */
     private void logInjectionError(Field field, Object bean, Exception e, Context context) {
         if (context != null) {
@@ -133,5 +199,13 @@ public class DependencyInjector {
             Logger.error(DependencyInjector.class, 
                 "注入失败：" + field.getName() + " in " + bean.getClass().getSimpleName(), e);
         }
+    }
+    
+    /**
+     * 记录静态字段注入错误日志
+     */
+    private void logStaticInjectionError(Field field, Exception e) {
+        Logger.error(DependencyInjector.class, 
+            "静态字段注入失败：" + field.getName() + " in " + field.getDeclaringClass().getSimpleName(), e);
     }
 }

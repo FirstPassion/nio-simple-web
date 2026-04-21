@@ -7,16 +7,18 @@
 
 ## ✨ 特性
 
-- 🚀 **高性能**: 基于 Java NIO 异步非阻塞模型
+- 🚀 **高性能**: 基于 Java NIO 异步非阻塞模型 + 线程池并发处理
 - 📝 **注解驱动**: 支持 `@Get`、`@Post`、`@Put`、`@Delete` 等 HTTP 方法注解
 - 🔗 **灵活路由**: 支持路径变量、查询参数、精确匹配优先
 - 🍪 **Cookie/Session**: 内置 Cookie 操作和 Session 管理（30 分钟超时）
 - 🔄 **重定向**: 支持 302 临时重定向和 301 永久重定向
 - 📦 **参数绑定**: 自动绑定 `@PathParam`、`@QueryParam`、`@BodyParam`、`@Header`
-- 🧩 **IOC 容器**: 自动扫描 `@Component`、`@Path` 并注入依赖，支持无参构造和有参构造的依赖注入
+- 🧩 **IOC 容器**: 自动扫描 `@Component`、`@Path` 并注入依赖，支持无参构造、有参构造和静态字段注入
 - 🌐 **WebSocket**: 完整的 WebSocket 支持
 - 📡 **SSE**: 服务端发送事件支持
 - 📄 **静态文件**: 内置静态文件服务
+- 🛡️ **异常安全**: 全局异常捕获机制，确保任何错误都有响应，防止请求卡死
+- ⚡ **优雅停机**: 支持 JVM 关机钩子，确保正在处理的请求完成后再关闭
 
 ## 📦 项目结构
 
@@ -42,9 +44,10 @@ nio-simple-web/
 │   │   ├── HttpStatus.java   # HTTP 状态码
 │   │   └── ContentTypes.java # Content-Type 常量
 │   ├── core/                 # 核心模块
-│   │   ├── DApp.java         # 启动入口类
+│   │   ├── DApp.java         # 启动入口类（外观模式）
 │   │   ├── Context.java      # 请求上下文（含 Cookie/Session/重定向）
-│   │   └── Worker.java       # 工作线程
+│   │   ├── Worker.java       # 工作线程（线程池管理）
+│   │   └── DispatcherServlet.java # 请求调度中心（责任链模式）
 │   ├── exception/            # 异常类
 │   ├── function/             # 函数式接口
 │   │   ├── Handler.java      # 请求处理器
@@ -66,6 +69,8 @@ nio-simple-web/
 │   │   ├── RouteRegistry.java   # 路由注册表
 │   │   ├── RouteMapping.java    # 路由映射
 │   │   └── RequestDispatcher.java# 请求分发器
+│   ├── exception/            # 异常处理
+│   │   └── ExceptionHandler.java # 全局异常处理器（责任链节点）
 │   ├── util/                 # 工具类
 │   │   ├── Logger.java       # 日志工具
 │   │   └── Utils.java        # 通用工具
@@ -142,6 +147,7 @@ import com.da.web.core.DApp;
 
 public class Main {
     public static void main(String[] args) {
+        // 方式一：指定端口启动（自动扫描当前类所在包）
         DApp app = new DApp(8080);
         
         // 手动注册路由（优先级高于注解路由）
@@ -149,13 +155,19 @@ public class Main {
         
         // 启动并自动扫描 @Component 和 @Path
         app.start();
+        
+        // 方式二：指定启动类（用于静态字段注入）
+        // DApp app = new DApp(MyApp.class);
+        // app.listen(); // 自动注入静态@Inject 字段
     }
 }
 ```
 
 ### 4. 依赖注入示例
 
-IOC 容器支持无参构造和有参构造的自动依赖注入：
+IOC 容器支持三种注入方式：无参构造、有参构造和静态字段注入。
+
+#### 4.1 实例字段注入（原有功能）
 
 ```java
 // 服务类
@@ -201,6 +213,40 @@ public class OrderController {
 2. **Fallback 到有参构造**：如果没有无参构造，遍历所有构造函数，尝试从 BeanContainer 中获取参数进行依赖注入
 3. **Bean 查找规则**：支持首字母小写的 bean 名、全名、类型匹配三种方式
 
+#### 4.2 静态字段注入（新增）
+
+适用于快速测试或传统静态工具类场景：
+
+```java
+import com.da.web.annotations.Component;
+import com.da.web.annotations.Inject;
+import com.da.web.core.DApp;
+
+@Component("userService")
+class UserService {
+    public String getServiceName() {
+        return "User Service";
+    }
+}
+
+// 启动类不需要@Component 注解
+public class MyApp {
+    @Inject("userService")
+    private static UserService userService;  // 静态字段注入
+    
+    public static void main(String[] args) {
+        // 传入启动类，listen() 时会自动注入静态字段
+        DApp app = new DApp(MyApp.class);
+        app.use("/", ctx -> {
+            ctx.send(userService.getServiceName());  // 不会空指针
+        });
+        app.listen();
+    }
+}
+```
+
+**注意**：使用静态字段注入时，必须通过 `new DApp(StartupClass.class)` 传入启动类，然后调用 `app.listen()` 而非`app.start()`。
+
 ## 📖 API 文档
 
 ### 注解说明
@@ -218,7 +264,18 @@ public class OrderController {
 | `@BodyParam("field")` | 参数级别 | 绑定请求体字段 |
 | `@Header("name")` | 参数级别 | 绑定请求头 |
 | `@Component` | 类级别 | 标记为组件，自动扫描 |
-| `@Inject` | 字段/构造器 | 依赖注入 |
+| `@Inject("beanName")` | 字段/构造器 | 依赖注入（支持实例字段和静态字段） |
+
+### 设计模式
+
+框架核心采用以下设计模式，确保代码精简、强悍、易扩展：
+
+| 模式 | 应用位置 | 作用 |
+|------|----------|------|
+| **外观模式 (Facade)** | DApp + DispatcherServlet | 统一入口，隐藏内部复杂性 |
+| **责任链模式 (Chain)** | ExceptionHandler → RequestDispatcher | 请求处理管道，异常兜底 |
+| **单例模式** | BeanContainer + DependencyInjector | 全局唯一容器，启动时预初始化 |
+| **策略模式** | Handler 接口 | 支持动态插入中间件 |
 
 ### Context 方法
 
@@ -323,6 +380,32 @@ public void getUser(@PathParam("id") Integer id, Context ctx) { ... }
 - **Session 存储**: 当前使用内存存储，重启后丢失，生产环境建议集成 Redis
 - **线程安全**: Controller 是单例的，请注意并发问题
 - **路径变量**: 支持多个路径变量，如 `/user/{userId}/order/{orderId}`
+- **静态字段注入**: 必须通过 `new DApp(StartupClass.class)`传入启动类，调用`app.listen()` 而非`app.start()`
+- **异常处理**: 全局异常捕获确保任何错误都返回 HTTP 响应，不会卡住连接
+- **优雅停机**: Ctrl+C 终止时会自动等待正在处理的请求完成（最多 5 秒）
+
+## 🏗️ 架构演进
+
+### v1.0.0 (当前版本) 核心重构
+
+本次重构采用**外观模式 + 责任链模式**，大幅精简核心代码：
+
+**重构前问题：**
+- ❌ Worker 类职责过重，耦合多个依赖
+- ❌ 静态字段注入不支持，导致空指针异常
+- ❌ 异常处理分散，请求可能卡死无响应
+- ❌ 手动线程管理，高并发性能不稳定
+
+**重构后改进：**
+- ✅ 新增 `DispatcherServlet`统一调度，Worker 只负责 IO
+- ✅ `DependencyInjector`支持静态字段，启动时自动注入
+- ✅ `ExceptionHandler` 责任链节点，确保异常有响应
+- ✅ 线程池替代手动线程，支持优雅停机
+
+**代码量变化：**
+- Worker: ~200 行 → ~180 行（精简 10%）
+- DApp: ~250 行 → ~230 行（精简 8%）
+- 新增：DispatcherServlet (~60 行), ExceptionHandler (~40 行)
 
 ## 🤝 贡献
 
