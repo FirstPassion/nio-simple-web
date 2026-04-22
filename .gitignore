@@ -8,10 +8,14 @@ build/
 target/
 
 # Dependencies
-lib/
-libs/
-dependency/
-dependencies/
+.gradle/
+.mypy_cache/
+.pytest_cache/
+__pycache__/
+node_modules/
+venv/
+.venv/
+dist/
 
 # Logs and temp files
 *.log
@@ -26,4 +30,13 @@ dependencies/
 .env
 .env.local
 *.env.*
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# System files
+.DS_Store
+Thumbs.db
 ```

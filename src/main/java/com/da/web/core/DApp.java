@@ -280,10 +280,8 @@ public class DApp {
         for (String beanName : beanContainer.getBeanNames()) {
             Object bean = beanContainer.getBean(beanName).get();
             
-            // 不是 Handler 接口实现的（即 Component Bean）
-            if (!Utils.isInterface(bean.getClass(), Handler.class)) {
-                dependencyInjector.injectToComponentBean(bean);
-            }
+            // 给所有 Component Bean 注入依赖（包括 Handler 实现类）
+            dependencyInjector.injectToComponentBean(bean);
         }
     }
     
