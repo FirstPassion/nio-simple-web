@@ -152,9 +152,7 @@ public class ComponentScanner {
             if (method.getDeclaringClass() == Object.class) {
                 continue;
             }
-            //if (registerMethodRoute(beanInstance, classPath, method, routeRegistry, registeredMethods)) {
-                //TODO 已成功注册
-            //}
+            registerMethodRoute(beanInstance, classPath, method, routeRegistry, registeredMethods);
         }
     }
     
