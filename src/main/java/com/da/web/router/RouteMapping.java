@@ -2,6 +2,11 @@ package com.da.web.router;
 
 import com.da.web.function.Handler;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * 路由映射类，支持 HTTP 方法和路径变量
  */
@@ -23,7 +28,7 @@ public class RouteMapping {
         if (path.contains("{") && path.contains("}")) {
             this.hasPathVariables = true;
             String[] parts = path.split("/");
-            java.util.List<String> varNames = new java.util.ArrayList<>();
+            List<String> varNames = new ArrayList<>();
             for (String part : parts) {
                 if (part.startsWith("{") && part.endsWith("}")) {
                     varNames.add(part.substring(1, part.length() - 1));
@@ -123,8 +128,8 @@ public class RouteMapping {
     /**
      * 从请求路径中提取路径变量值
      */
-    public java.util.Map<String, String> extractPathVariables(String requestPath) {
-        java.util.Map<String, String> variables = new java.util.HashMap<>();
+    public Map<String, String> extractPathVariables(String requestPath) {
+        Map<String, String> variables = new HashMap<>();
         
         if (!hasPathVariables) {
             return variables;

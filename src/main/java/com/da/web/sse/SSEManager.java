@@ -139,10 +139,9 @@ public class SSEManager {
             
             executor.submit(() -> {
                 try {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append("event: ").append(event).append("\r\n");
-                    sb.append("data: ").append(data).append("\r\n\r\n");
-                    ByteBuffer buffer = ByteBuffer.wrap(sb.toString().getBytes(StandardCharsets.UTF_8));
+                    String sb = "event: " + event + "\r\n" +
+                            "data: " + data + "\r\n\r\n";
+                    ByteBuffer buffer = ByteBuffer.wrap(sb.getBytes(StandardCharsets.UTF_8));
                     channel.write(buffer);
                 } catch (IOException e) {
                     active = false;

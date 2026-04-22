@@ -28,9 +28,8 @@ public class ComponentScanner {
     
     /**
      * 执行扫描
-     * @return 扫描到的类列表
      */
-    public List<Class<?>> scan() {
+    public void scan() {
         scannedClasses.clear();
         String rootPathName = Utils.replace(basePackage, "\\.", "/");
         File rootPath = Utils.getResourceFile(rootPathName);
@@ -41,7 +40,6 @@ public class ComponentScanner {
         }
         
         Logger.info(ComponentScanner.class, "扫描完成，共发现 " + scannedClasses.size() + " 个组件类");
-        return scannedClasses;
     }
     
     /**
@@ -52,9 +50,7 @@ public class ComponentScanner {
         
         if (fileAbsolutePath.endsWith(".class")) {
             String className = extractClassName(packageName, fileAbsolutePath);
-            if (className != null) {
-                processClassName(className);
-            }
+            processClassName(className);
         }
     }
     
@@ -156,9 +152,9 @@ public class ComponentScanner {
             if (method.getDeclaringClass() == Object.class) {
                 continue;
             }
-            if (registerMethodRoute(beanInstance, classPath, method, routeRegistry, registeredMethods)) {
-                // 已成功注册
-            }
+            //if (registerMethodRoute(beanInstance, classPath, method, routeRegistry, registeredMethods)) {
+                //TODO 已成功注册
+            //}
         }
     }
     

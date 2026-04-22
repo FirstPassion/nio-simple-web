@@ -31,7 +31,7 @@ public class DependencyInjector {
     public void injectToComponentBean(Object bean) {
         Class<?> clz = bean.getClass();
         
-        // 如果类有@Configuration 注解，从 YAML 配置注入
+        // 如果类有@Configuration 注解，从配置文件注入
         if (clz.isAnnotationPresent(Configuration.class)) {
             configLoader.injectToConfig(bean);
         }

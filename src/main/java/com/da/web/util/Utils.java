@@ -19,8 +19,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.da.web.util.Logger;
-
 /**
  * Author Da
  * Description: <br/>
@@ -299,7 +297,7 @@ public class Utils {
         // 直接按类型名称查找
         String beanName = type.getSimpleName();
         // 首字母小写
-        if (beanName.length() > 0) {
+        if (!beanName.isEmpty()) {
             beanName = Character.toLowerCase(beanName.charAt(0)) + beanName.substring(1);
         }
         
@@ -315,7 +313,7 @@ public class Utils {
         // 遍历所有 Bean，查找匹配类型的
         for (String name : beanContainer.getBeanNames()) {
             Object bean = beanContainer.getBean(name).orElse(null);
-            if (bean != null && type.isInstance(bean)) {
+            if (type.isInstance(bean)) {
                 return bean;
             }
         }

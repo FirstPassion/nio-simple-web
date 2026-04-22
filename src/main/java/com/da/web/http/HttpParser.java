@@ -251,7 +251,7 @@ public class HttpParser {
         
         while (ctx.hasRemaining()) {
             String line = readLine(ctx);
-            if (line == null || line.isEmpty()) {
+            if (line.isEmpty()) {
                 // 空行表示 headers 结束
                 break;
             }
@@ -314,7 +314,7 @@ public class HttpParser {
 
         byte[] body = new byte[contentLength];
         if (ctx.remaining() >= contentLength) {
-            ctx.read(body, 0, contentLength);
+            ctx.read(body, contentLength);
             request.setRawBody(body);
             
             // 根据 Content-Type 解析 body
@@ -575,11 +575,11 @@ public class HttpParser {
             return data[position++];
         }
 
-        void read(byte[] buffer, int offset, int length) {
+        void read(byte[] buffer, int length) {
             if (position + length > data.length) {
                 throw new IndexOutOfBoundsException("Not enough data");
             }
-            System.arraycopy(data, position, buffer, offset, length);
+            System.arraycopy(data, position, buffer, 0, length);
             position += length;
         }
 

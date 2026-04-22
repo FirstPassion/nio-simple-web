@@ -5,6 +5,7 @@ import java.io.StringWriter;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.TimeUnit;
 
 public class Logger {
     private static final String DEFAULT_LOG = "DApp";
@@ -24,7 +25,7 @@ public class Logger {
                     System.out.print(sb);
                 }
                 try {
-                    Thread.sleep(100);
+                    TimeUnit.MILLISECONDS.sleep(100);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;

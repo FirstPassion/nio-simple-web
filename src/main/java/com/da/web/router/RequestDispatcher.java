@@ -14,67 +14,72 @@ import java.util.Map;
  * 匹配顺序：手动注册路由 → 注解路由 → staticFiles → beans
  */
 public class RequestDispatcher {
-    
+
     private final RouteRegistry routeRegistry;
     private final BeanContainer beanContainer;
     private final StaticFileRegistry staticFileRegistry;
-    
-    public RequestDispatcher(RouteRegistry routeRegistry, 
-                            BeanContainer beanContainer,
-                            StaticFileRegistry staticFileRegistry) {
+
+    public RequestDispatcher(RouteRegistry routeRegistry,
+                             BeanContainer beanContainer,
+                             StaticFileRegistry staticFileRegistry) {
         this.routeRegistry = routeRegistry;
         this.beanContainer = beanContainer;
         this.staticFileRegistry = staticFileRegistry;
     }
-    
+
     /**
      * 分发请求到对应的处理器
      */
     public void dispatch(Context context) throws Exception {
         String url = context.getUrl();
         String method = context.getMethod();
-        
+
         // 1. 优先匹配显式注册的路由（包括 HTTP 方法匹配）
         Optional<RouteMapping> routeMapping = routeRegistry.getRouteMapping(url, method);
         if (routeMapping.isPresent()) {
             RouteMapping mapping = routeMapping.get();
-            
+
             // 提取路径变量并设置到 Context
             if (mapping.hasPathVariables()) {
                 Map<String, String> pathVariables = mapping.extractPathVariables(url);
                 context.setPathVariables(pathVariables);
             }
-            
+
             mapping.getHandler().callback(context);
             return;
         }
-        
+
         // 2. 匹配静态资源
         Optional<File> staticFile = staticFileRegistry.getFile(url);
         if (staticFile.isPresent()) {
             context.send(staticFile.get());
             return;
         }
-        
+
         // 3. 匹配 Bean（@Path 注解的类）
         if (beanContainer.containsBean(url)) {
-            Object bean = beanContainer.getBean(url).get();
-            if (bean instanceof Handler) {
-                ((Handler) bean).callback(context);
-                return;
-            }
+            beanContainer.getBean(url)
+                    .filter(bean -> bean instanceof Handler)
+                    .map(Handler.class::cast)
+                    .ifPresent(handler -> {
+                        try {
+                            handler.callback(context);
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
         }
-        
+
         // 4. 未找到，返回 404
         context.sendHtml("<h1 style='color: red;text-align: center;'>404 not found</h1><hr/>", 404);
     }
-    
+
     /**
      * 检查是否存在对应的路由
      */
     public boolean hasRoute(String url) {
-        return routeRegistry.hasRoute(url, "GET") || 
-               staticFileRegistry.hasFile(url) || 
-               beanContainer.containsBean(url);
+        return routeRegistry.hasRoute(url, "GET") ||
+                staticFileRegistry.hasFile(url) ||
+                beanContainer.containsBean(url);
     }
 }

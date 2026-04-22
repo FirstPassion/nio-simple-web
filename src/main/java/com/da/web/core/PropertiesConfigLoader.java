@@ -16,7 +16,7 @@ import java.util.Properties;
 public class PropertiesConfigLoader {
     
     private static final String CONFIG_FILE = "app.properties";
-    private Properties configProps;
+    private final Properties configProps;
     
     /**
      * 加载 app.properties 配置文件

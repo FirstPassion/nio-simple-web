@@ -1,6 +1,5 @@
 package com.da.web.core;
 
-import com.da.web.function.Handler;
 import com.da.web.function.WsListener;
 import com.da.web.http.HttpRequest;
 import com.da.web.util.Logger;

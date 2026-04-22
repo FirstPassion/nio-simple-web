@@ -11,15 +11,14 @@ import com.da.web.util.Logger;
  * 统一管理请求处理流程：异常捕获 → 路由匹配 → 业务执行
  */
 public class DispatcherServlet {
-    
-    private final RequestDispatcher requestDispatcher;
+
     private final HandlerChain exceptionHandler;
     
     public DispatcherServlet(RouteRegistry routeRegistry, 
                             BeanContainer beanContainer,
                             StaticFileRegistry staticFileRegistry) {
         // 创建请求分发器
-        this.requestDispatcher = new RequestDispatcher(routeRegistry, beanContainer, staticFileRegistry);
+        RequestDispatcher requestDispatcher = new RequestDispatcher(routeRegistry, beanContainer, staticFileRegistry);
         // 创建异常处理器（责任链第一个节点）
         this.exceptionHandler = new ExceptionHandler(requestDispatcher);
     }

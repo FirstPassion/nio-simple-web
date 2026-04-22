@@ -38,7 +38,7 @@ public class Context {
     private final HttpResponse response;
     private final SocketChannel channel;
     private WsListener wsListener;
-    private Map<String, String> pathVariables;
+    private final Map<String, String> pathVariables;
 
     public Context(SocketChannel channel) {
         this.channel = channel;

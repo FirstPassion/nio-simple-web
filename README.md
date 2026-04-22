@@ -154,7 +154,7 @@ public class Main {
         app.use("/health", "GET", ctx -> ctx.send("OK"));
         
         // 启动并自动扫描 @Component 和 @Path
-        app.start();
+        app.listen();
         
         // 方式二：指定启动类（用于静态字段注入）
         // DApp app = new DApp(MyApp.class);
@@ -325,9 +325,6 @@ mvn test
 
 # 运行特定测试类
 mvn test -Dtest=FullTest
-
-# 查看测试报告
-cat TEST_REPORT.md
 ```
 
 ### FullTest 综合测试
@@ -383,29 +380,6 @@ public void getUser(@PathParam("id") Integer id, Context ctx) { ... }
 - **静态字段注入**: 必须通过 `new DApp(StartupClass.class)`传入启动类，调用`app.listen()` 而非`app.start()`
 - **异常处理**: 全局异常捕获确保任何错误都返回 HTTP 响应，不会卡住连接
 - **优雅停机**: Ctrl+C 终止时会自动等待正在处理的请求完成（最多 5 秒）
-
-## 🏗️ 架构演进
-
-### v1.0.0 (当前版本) 核心重构
-
-本次重构采用**外观模式 + 责任链模式**，大幅精简核心代码：
-
-**重构前问题：**
-- ❌ Worker 类职责过重，耦合多个依赖
-- ❌ 静态字段注入不支持，导致空指针异常
-- ❌ 异常处理分散，请求可能卡死无响应
-- ❌ 手动线程管理，高并发性能不稳定
-
-**重构后改进：**
-- ✅ 新增 `DispatcherServlet`统一调度，Worker 只负责 IO
-- ✅ `DependencyInjector`支持静态字段，启动时自动注入
-- ✅ `ExceptionHandler` 责任链节点，确保异常有响应
-- ✅ 线程池替代手动线程，支持优雅停机
-
-**代码量变化：**
-- Worker: ~200 行 → ~180 行（精简 10%）
-- DApp: ~250 行 → ~230 行（精简 8%）
-- 新增：DispatcherServlet (~60 行), ExceptionHandler (~40 行)
 
 ## 🤝 贡献
 

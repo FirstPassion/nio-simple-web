@@ -2,6 +2,7 @@ package com.da.web.io;
 
 import java.io.File;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -23,8 +24,8 @@ public class StaticFileRegistry {
     /**
      * 获取静态文件
      */
-    public java.util.Optional<File> getFile(String path) {
-        return java.util.Optional.ofNullable(staticFiles.get(path));
+    public Optional<File> getFile(String path) {
+        return Optional.ofNullable(staticFiles.get(path));
     }
     
     /**
